@@ -19,8 +19,8 @@
 
 {% elif not r.result_ready %}
 <section role="status" class="card p-4 sm:p-5 flex items-center gap-3">
-  <span class="relative grid place-items-center h-9 w-9 shrink-0 rounded-full bg-accent-50 dark:bg-accent-600/20 text-accent-600">
-    <span class="absolute inset-0 rounded-full ring-2 ring-accent-500/40 animate-ping"></span><i data-lucide="hourglass" class="h-4 w-4"></i>
+  <span class="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-accent-50 dark:bg-accent-600/20 text-accent-600 animate-pulse">
+    <i data-lucide="hourglass" class="h-4 w-4"></i>
   </span>
   <div>
     <h2 class="font-semibold">Queued — waiting for the sourcing agent to pick this up</h2>
@@ -29,8 +29,8 @@
 </section>
 
 {% elif rfq_pending or po_pending %}
-<section role="status" class="rounded-card border border-accent-200 dark:border-accent-600/40 bg-accent-50 dark:bg-accent-600/10 p-4 sm:p-5 flex flex-wrap items-center gap-3">
-  <span class="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-accent-100 dark:bg-accent-600/30 text-accent-700 dark:text-accent-100"><i data-lucide="hand" class="h-4 w-4"></i></span>
+<section role="status" class="rounded-card border border-accent-200 dark:border-accent-600/40 bg-accent-50 dark:bg-accent-600/10 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+  <span class="hidden sm:grid place-items-center h-9 w-9 shrink-0 rounded-full bg-accent-100 dark:bg-accent-600/30 text-accent-700 dark:text-accent-100"><i data-lucide="hand" class="h-4 w-4"></i></span>
   <div class="min-w-0 flex-1">
     <h2 class="font-semibold text-accent-900 dark:text-accent-50">
       {% if can %}Waiting for your approval{% else %}Waiting for the approver{% endif %}
@@ -39,7 +39,7 @@
       {% if rfq_pending %}{{ rfq_pending | length }} quote request{{ 's' if rfq_pending | length != 1 }} ready to send{% else %}The purchase order is ready to send{% endif %}. Nothing is emailed until a person approves it.
     </p>
   </div>
-  <a href="#approvals" class="btn-primary">{% if can %}Review and decide{% else %}See the drafts{% endif %}<i data-lucide="arrow-down" class="h-4 w-4"></i></a>
+  <a href="#approvals" class="btn-primary w-full sm:w-auto">{% if can %}Review and decide{% else %}See the drafts{% endif %}<i data-lucide="arrow-down" class="h-4 w-4"></i></a>
 </section>
 
 {% elif r.state == 'WAIT_QUOTES' %}

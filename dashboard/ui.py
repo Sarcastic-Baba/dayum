@@ -1,5 +1,6 @@
 """Presentation helpers for templates: formatting and the pipeline stepper. No business logic."""
 
+import re
 from datetime import datetime, timedelta, timezone
 
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -122,6 +123,26 @@ def size(spec) -> str:
     return " × ".join(indian_number(d, 0) if float(d).is_integer() else str(d) for d in dims) + " in"
 
 
+_REASON_PART = re.compile(r"^\s*([a-z_]+)\s*=\s*(pass|fail|cannot_verify)\b\s*(.*)$")
+
+
+def reason_parts(reason) -> dict:
+    """'not eligible: manufacturer=fail (calls itself a trader), real_active=cannot_verify'
+    -> {'checks': [{'label': 'Manufacturer', 'result': 'fail', 'note': 'calls itself a trader'}, ...],
+        'text': None}. Anything not in that shape is returned as plain text."""
+    text = str(reason or "").strip()
+    text = re.sub(r"^not eligible:\s*", "", text, flags=re.I)
+    checks = []
+    for part in re.split(r",\s*(?=[a-z_]+\s*=)", text):
+        m = _REASON_PART.match(part)
+        if not m:
+            return {"checks": [], "text": text}
+        name, result, note = m.groups()
+        checks.append({"label": CHECK_LABEL.get(name, name.replace("_", " ").capitalize()),
+                       "result": result, "note": note.strip().strip("()").strip()})
+    return {"checks": checks, "text": None}
+
+
 def safe_url(value) -> str:
     """Only http(s) links are rendered as hrefs; scraped data must never inject javascript: URLs."""
     text = str(value or "").strip()
@@ -131,7 +152,7 @@ def safe_url(value) -> str:
 def install(templates) -> None:
     env = templates.env
     env.filters.update(inr=inr, num=indian_number, ist=ist, day=day, duration=duration, size=size,
-                       safe_url=safe_url)
+                       safe_url=safe_url, reason_parts=reason_parts)
     env.globals.update(stepper=stepper, STATUS_STYLE=STATUS_STYLE, RESULT_STYLE=RESULT_STYLE,
                        CLASSIFICATION_STYLE=CLASSIFICATION_STYLE, CHECK_LABEL=CHECK_LABEL,
                        STATE_LABELS=STATE_LABELS, HUMAN_WAIT=HUMAN_WAIT)

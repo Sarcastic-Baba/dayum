@@ -7,7 +7,7 @@
     <dt class="muted">To</dt><dd class="break-all font-medium">{{ a.email_to or '—' }}</dd>
     <dt class="muted">Subject</dt><dd class="font-medium">{{ a.email_subject or '—' }}</dd>
   </dl>
-  <pre class="px-4 py-4 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-800 dark:text-slate-200 max-h-80 overflow-y-auto">{{ a.email_body }}</pre>
+  <pre class="px-4 py-4 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-800 dark:text-slate-200 max-h-[32rem] overflow-y-auto">{{ a.email_body }}</pre>
   {% else %}
   <p class="px-4 py-3 text-sm text-amber-700 dark:text-amber-300 flex gap-2"><i data-lucide="file-question" class="h-4 w-4 shrink-0 mt-0.5"></i>No draft yet — it cannot be approved until the exact email text is here to review.</p>
   {% endif %}

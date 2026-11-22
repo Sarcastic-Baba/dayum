@@ -1,3 +1,4 @@
+{% if r.result_ready or r.candidates %}
 <section class="card overflow-hidden" aria-labelledby="cand-title">
   <div class="px-5 pt-5 pb-3 flex flex-wrap items-center justify-between gap-2">
     <h2 id="cand-title" class="font-semibold">Candidate suppliers</h2>
@@ -83,9 +84,10 @@
     </table>
   </div>
   <ul class="px-5 py-3 text-xs muted border-t border-slate-100 dark:border-slate-800 space-y-1">
-    <li class="flex gap-1.5"><i data-lucide="mouse-pointer-click" class="h-3.5 w-3.5 shrink-0"></i>Click a supplier to see every check with its source, the exact quote, and its dates.</li>
-    <li class="flex gap-1.5"><i data-lucide="arrow-down-wide-narrow" class="h-3.5 w-3.5 shrink-0"></i>Ranking uses the <strong class="font-medium text-slate-600 dark:text-slate-300">quoted</strong> price from each supplier's reply. The listed price is only a hint before quotes arrive.</li>
-    <li class="flex gap-1.5"><i data-lucide="calculator" class="h-3.5 w-3.5 shrink-0"></i>Transport and landed cost are <em>estimates</em> from the client's own rates, not sourced facts.</li>
+    <li class="flex gap-1.5"><i data-lucide="mouse-pointer-click" class="h-3.5 w-3.5 shrink-0 mt-px"></i><span>Click a supplier to see every check with its source, the exact quote, and its dates.</span></li>
+    <li class="flex gap-1.5"><i data-lucide="arrow-down-wide-narrow" class="h-3.5 w-3.5 shrink-0 mt-px"></i><span>Ranking uses the <strong class="font-medium text-slate-600 dark:text-slate-300">quoted</strong> price from each supplier's reply. The listed price is only a hint before quotes arrive.</span></li>
+    <li class="flex gap-1.5"><i data-lucide="calculator" class="h-3.5 w-3.5 shrink-0 mt-px"></i><span>Transport and landed cost are <em>estimates</em> from the client's own rates, not sourced facts.</span></li>
   </ul>
   {% endif %}
 </section>
+{% endif %}

@@ -287,6 +287,14 @@ def test_indian_number_grouping():
     assert inr(None) == "—"
 
 
+def test_not_eligible_reason_is_split_into_checks():
+    from dashboard.ui import reason_parts
+    parts = reason_parts("not eligible: manufacturer=fail (calls itself a trader), real_active=cannot_verify")
+    assert [(p["label"], p["result"]) for p in parts["checks"]] == [("Manufacturer", "fail"), ("Real & active", "cannot_verify")]
+    assert parts["checks"][0]["note"] == "calls itself a trader"
+    assert reason_parts("duplicate of sup_01")["text"] == "duplicate of sup_01"
+
+
 def test_safe_url_blocks_javascript():
     from dashboard.ui import safe_url
     assert safe_url("javascript:alert(1)") == "#"
