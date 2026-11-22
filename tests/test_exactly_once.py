@@ -27,7 +27,7 @@ from engine import emails
 from engine.actions import send_key
 from engine.config import load_config
 from engine.db import open_db
-from fixture_data import cleanup, seed
+from tests.fixture_data import cleanup, seed
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKEND = os.environ.get("BOXSOURCE_TEST_BACKEND", "sqlite")

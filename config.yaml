@@ -43,6 +43,10 @@ sources:
   discovery: gemini                   # gemini (grounded search) | crustdata
   llm: gemini
 
+llm:                                  # engine-side extraction (free-text requests from the dashboard)
+  models: [gemini-flash-lite-latest]  # one model: accurate in testing, and the ledger sees every call
+  timeout_s: 20
+
 voice:                                # Vapi phone intake (voice_server.py, VOICE_DEMO.md)
   timeout_s: 8                        # per tool call; on timeout the caller hears a fallback line
   llm_timeout_s: 6.5                  # both models are asked at once; first valid answer wins

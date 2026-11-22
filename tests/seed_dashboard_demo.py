@@ -15,11 +15,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT), str(ROOT / "tests")]
+sys.path.insert(0, str(ROOT))
 
 from engine.config import load_config  # noqa: E402
 from engine.db import open_db  # noqa: E402
-from fixture_data import cleanup, seed  # noqa: E402
+from tests.fixture_data import cleanup, seed  # noqa: E402
 
 RID = "DEMO-UI-1"
 

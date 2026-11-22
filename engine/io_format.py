@@ -5,8 +5,9 @@ REQUIRED = ("item", "quantity_per_month", "delivery_location")
 SPEC_FIELDS = ("ply", "size_in", "material")
 
 
-def is_free_text(raw):
-    return bool(raw.get("text")) and not raw.get("item")
+def free_text(raw):
+    """The free-text part of a request: the dashboard stores it as `free_text`."""
+    return (raw.get("free_text") or raw.get("text") or "").strip()
 
 
 def normalize_input(raw):

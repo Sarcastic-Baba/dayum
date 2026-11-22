@@ -75,6 +75,7 @@ def refresh(db, cfg, request_id, **narrative):
         "actions": _actions(db, request_id),
         "cost_inr": total_cost(db, request_id),
         "duration_s": active_seconds(db, request_id),
+        "limits": cfg.get("limits"),  # the dashboard's cost/time progress bars
         "updated_at": now_iso(),
     }
     db.update("requests", {"request_id": request_id}, {"result_json": full, "updated_at": now_iso()})
