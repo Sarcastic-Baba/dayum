@@ -3,6 +3,7 @@ the dashboard only renders what the engine wrote and records human decisions."""
 
 import hashlib
 import secrets
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -144,20 +145,32 @@ def _cost_by_request(db, request_ids) -> dict:
 
 def get_request_view(db, request_id: str) -> dict | None:
     """Assemble the PRD §7 output shape (plus UI extras) from all tables."""
-    rows = db.select("requests", {"request_id": f"eq.{request_id}"})
-    if not rows:
-        return None
-    req = rows[0]
     by_req = {"request_id": f"eq.{request_id}"}
-    candidates = db.select("candidates", by_req)
-    checks = db.select("checks", by_req)
-    evidence = db.select("evidence", by_req, order="id.asc")
-    quotes = db.select("quotes", by_req, order="received_at.asc")
-    approvals = db.select("approvals", by_req, order="id.asc")
-    outbox_keys = {o["idem_key"] for o in db.select("outbox", {"approval_id": _in([a["id"] for a in approvals])},
-                                                    columns="idem_key,approval_id")} if approvals else set()
-    costs = db.select("costs", by_req, order="at.asc")
-    logs = db.select("logs", by_req, order="at.desc", limit=200)
+
+    def approvals_and_sent():
+        approvals = db.select("approvals", by_req, order="id.asc")
+        sent = {o["idem_key"] for o in db.select("outbox", {"approval_id": _in([a["id"] for a in approvals])},
+                                                 columns="idem_key,approval_id")} if approvals else set()
+        return approvals, sent
+
+    # Independent reads run concurrently: the page polls every few seconds.
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        jobs = {
+            "request": pool.submit(db.select, "requests", by_req),
+            "candidates": pool.submit(db.select, "candidates", by_req),
+            "checks": pool.submit(db.select, "checks", by_req),
+            "evidence": pool.submit(db.select, "evidence", by_req, "*", "id.asc"),
+            "quotes": pool.submit(db.select, "quotes", by_req, "*", "received_at.asc"),
+            "approvals": pool.submit(approvals_and_sent),
+            "costs": pool.submit(db.select, "costs", by_req, "*", "at.asc"),
+            "logs": pool.submit(db.select, "logs", by_req, "*", "at.desc", 200),
+        }
+        got = {name: job.result() for name, job in jobs.items()}
+    if not got["request"]:
+        return None
+    req = got["request"][0]
+    candidates, checks, evidence, quotes = got["candidates"], got["checks"], got["evidence"], got["quotes"]
+    (approvals, outbox_keys), costs, logs = got["approvals"], got["costs"], got["logs"]
 
     result = req.get("result_json") or {}
     result_by_supplier = {c.get("supplier_id"): c for c in result.get("candidates") or [] if isinstance(c, dict)}

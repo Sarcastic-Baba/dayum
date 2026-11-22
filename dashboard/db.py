@@ -27,7 +27,9 @@ class SupabaseDb:
         # Legacy service-role JWTs need Authorization; new sb_secret_ keys use apikey.
         if not key.startswith("sb_secret_"):
             self.headers["Authorization"] = f"Bearer {key}"
-        self.timeout = timeout
+        # One pooled, thread-safe client: reusing TLS connections cuts each call from
+        # ~1 s (new handshake) to one round trip.
+        self.http = httpx.Client(timeout=timeout, limits=httpx.Limits(max_connections=12))
 
     def select(self, table: str, filters: dict | None = None,
                columns: str = "*", order: str | None = None, limit: int | None = None) -> list[dict]:
@@ -51,8 +53,8 @@ class SupabaseDb:
         if prefer:
             headers["Prefer"] = prefer
         try:
-            response = httpx.request(method, f"{self.base}/{table}", params=params, json=json,
-                                     headers=headers, timeout=self.timeout)
+            response = self.http.request(method, f"{self.base}/{table}", params=params, json=json,
+                                         headers=headers)
         except httpx.HTTPError as exc:
             raise DbError(f"database unreachable: {type(exc).__name__}") from None
         if response.status_code == 409:
@@ -79,9 +81,15 @@ def _message(response) -> str:
         return response.text
 
 
+_shared: dict[tuple[str, str], SupabaseDb] = {}
+
+
 def from_env() -> SupabaseDb:
+    """One shared client per (url, key), so warm requests reuse open connections."""
     url = os.getenv("SUPABASE_URL", "")
     key = os.getenv("SUPABASE_SECRET_KEY", "")
     if not url.startswith("https://") or not key:
         raise DbError("database is not configured (SUPABASE_URL / SUPABASE_SECRET_KEY)")
-    return SupabaseDb(url, key)
+    if (url, key) not in _shared:
+        _shared[(url, key)] = SupabaseDb(url, key)
+    return _shared[(url, key)]
