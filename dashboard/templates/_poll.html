@@ -1,0 +1,6 @@
+{# One poll tick: out-of-band swaps only (the poller uses hx-swap="none"). The approvals
+   panel is included only when its version changed, so an open form is never replaced. #}
+{% include "partials/top.html" %}
+{% if approvals_changed %}{% include "partials/approvals.html" %}{% endif %}
+{% include "partials/bottom.html" %}
+{% include "partials/poller.html" %}

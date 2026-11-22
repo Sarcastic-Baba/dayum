@@ -123,7 +123,14 @@ async def create_request(request: Request):
         return page(request, "new.html", request_id=form.get("request_id") or repo.new_request_id(),
                     errors=_errors(exc), values=form)
     request_id, created = repo.create_request(db_of(request), data, user.email)
-    return back_to(request_id, notice="Request created." if created else "Request already existed.")
+    return back_to(request_id, notice="Request created — the sourcing agent will pick it up shortly."
+                   if created else "That request already existed; showing it.")
+
+
+# Human-readable names for form fields in validation messages.
+FIELD_NAMES = {"item": "Item", "spec.ply": "Ply", "spec.size_in": "Size", "quantity_per_month": "Quantity per month",
+               "delivery_location": "Delivery location", "needed_by": "Needed by",
+               "budget_inr_per_unit": "Budget per box", "request_id": "Request id"}
 
 
 def _form_to_input(form: dict) -> dict:
@@ -131,30 +138,29 @@ def _form_to_input(form: dict) -> dict:
         value = str(form.get(name, "")).strip()
         return value or None
 
-    def number(name, cast=float):
+    def number(name, label, cast=float):
         value = text(name)
         if value is None:
             return None
         try:
             return cast(value)
         except ValueError:
-            raise ValueError(f"{name.replace('_', ' ')} must be a number") from None
+            raise ValueError(f"{label} must be a number") from None
 
-    dims = [number("size_l"), number("size_w"), number("size_h")]
+    dims = [number("size_l", "Length"), number("size_w", "Width"), number("size_h", "Height")]
     return {
         "request_id": text("request_id"),
         "item": text("item"),
         "spec": {
-            "ply": number("ply", int),
+            "ply": number("ply", "Ply", int),
             "size_in": dims if all(d is not None for d in dims) else None,
             "material": text("material"),
             "printing": text("printing"),
         },
-        "quantity_per_month": number("quantity_per_month", int),
+        "quantity_per_month": number("quantity_per_month", "Quantity per month", int),
         "delivery_location": text("delivery_location"),
         "needed_by": text("needed_by"),
-        "budget_inr_per_unit": number("budget_inr_per_unit"),
-        "free_text": text("free_text"),
+        "budget_inr_per_unit": number("budget_inr_per_unit", "Budget per box"),
     }
 
 
@@ -163,8 +169,10 @@ def _errors(exc) -> list[str]:
         out = []
         for e in exc.errors():
             where = ".".join(str(p) for p in e["loc"])
-            msg = e["msg"].removeprefix("Value error, ")
-            out.append(f"{where}: {msg}" if where else msg)
+            label = FIELD_NAMES.get(where, where)
+            msg = "is required" if e["type"] in ("missing", "none_required") or (
+                e["type"].endswith("_type") and e.get("input") is None) else e["msg"].removeprefix("Value error, ")
+            out.append(f"{label}: {msg}" if label else msg)
         return out
     return [str(exc)]
 
@@ -175,24 +183,27 @@ def request_detail(request: Request, request_id: str, notice: str = "", error: s
     view = repo.get_request_view(db_of(request), request_id)
     if view is None:
         return page(request, "error.html", message=f"No request {request_id}.", status=404)
-    return page(request, "request.html", r=view, toast_notice=notice, toast_error=error, poll=_should_poll(view))
+    return page(request, "request.html", r=view, toast_notice=notice, toast_error=error,
+                poll=_should_poll(view), version=repo.approvals_version(view), oob=False)
 
 
 @router.get("/requests/{request_id}/live", response_class=HTMLResponse)
-def request_live(request: Request, request_id: str):
-    """htmx partial: re-rendered every few seconds while the engine is working."""
+def request_live(request: Request, request_id: str, v: str = ""):
+    """One poll tick (htmx, hx-swap=none): out-of-band swaps for the top and bottom of the
+    page every time, and for the approvals panel only when the approvals changed (version
+    `v`), so a half-filled approval form is never replaced underneath the user."""
     user_of(request)
     view = repo.get_request_view(db_of(request), request_id)
     if view is None:
         return HTMLResponse("", status_code=404)
-    return page(request, "_live.html", r=view, poll=_should_poll(view))
+    version = repo.approvals_version(view)
+    return page(request, "_poll.html", r=view, poll=_should_poll(view), version=version,
+                approvals_changed=version != v, oob=True)
 
 
 def _should_poll(view) -> bool:
-    """Stop refreshing when nothing will change without a human, so an
-    approval form being filled in is never re-rendered underneath the user."""
-    waiting_on_human = any(a["status"] == "pending_approval" for a in view["actions"])
-    return view["state"] not in repo.TERMINAL_STATES and not waiting_on_human
+    """Keep refreshing until the run is finished or on hold (DASHBOARD.md §3)."""
+    return view["state"] not in repo.TERMINAL_STATES
 
 
 @router.get("/api/requests")

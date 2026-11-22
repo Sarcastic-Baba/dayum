@@ -1,3 +1,4 @@
+{% if r.result_ready or r.candidates %}
 <section class="card overflow-hidden" aria-labelledby="cand-title">
   <div class="px-5 pt-5 pb-3 flex flex-wrap items-center justify-between gap-2">
     <h2 id="cand-title" class="font-semibold">Candidate suppliers</h2>
@@ -28,8 +29,8 @@
           <th scope="col" class="px-4 py-2.5 w-12 text-center">#</th>
           <th scope="col" class="px-4 py-2.5">Supplier</th>
           <th scope="col" class="px-4 py-2.5 hidden sm:table-cell">Checks</th>
-          <th scope="col" class="px-4 py-2.5 text-right hidden lg:table-cell">Listed</th>
-          <th scope="col" class="px-4 py-2.5 text-right">Quoted</th>
+          <th scope="col" class="px-4 py-2.5 text-right hidden lg:table-cell"><span title="The supplier's published price — a hint before quotes arrive, not used for ranking">Listed <span class="normal-case font-normal">(hint)</span></span></th>
+          <th scope="col" class="px-4 py-2.5 text-right"><span title="The price in the supplier's reply — the ranking uses this">Quoted</span></th>
           <th scope="col" class="px-4 py-2.5 text-right hidden md:table-cell">Distance</th>
           <th scope="col" class="px-4 py-2.5 text-right hidden md:table-cell">Landed <span class="normal-case font-normal">(est.)</span></th>
         </tr>
@@ -48,6 +49,7 @@
                     @click.stop='open({{ c.supplier_id | tojson }})' aria-label="Open evidence for {{ c.name }}">{{ c.name }}</button>
             <div class="mt-1 flex flex-wrap items-center gap-1.5">
               <span class="pill bg-{{ cls_color }}-100 text-{{ cls_color }}-700 dark:bg-{{ cls_color }}-500/15 dark:text-{{ cls_color }}-300">{{ c.classification | replace('_', ' ') }}</span>
+              {% if c.supplier_id in r.shortlist %}<span class="pill bg-accent-50 text-accent-700 dark:bg-accent-600/20 dark:text-accent-100"><i data-lucide="list-checks" class="h-3 w-3"></i>shortlisted</span>{% endif %}
               {% if c.merged_into %}<span class="pill bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><i data-lucide="merge" class="h-3 w-3"></i>merged into {{ c.merged_into }}</span>{% endif %}
               {% for f in c.flags %}<span class="pill bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"><i data-lucide="flag" class="h-3 w-3"></i>{{ f | replace('_', ' ') }}</span>{% endfor %}
             </div>
@@ -81,6 +83,11 @@
       </tbody>
     </table>
   </div>
-  <p class="px-5 py-3 text-xs muted border-t border-slate-100 dark:border-slate-800">Click a supplier to see every check with its source, quote and date. Landed cost and transport are <em>estimates</em> from the client's rates, not sourced facts.</p>
+  <ul class="px-5 py-3 text-xs muted border-t border-slate-100 dark:border-slate-800 space-y-1">
+    <li class="flex gap-1.5"><i data-lucide="mouse-pointer-click" class="h-3.5 w-3.5 shrink-0 mt-px"></i><span>Click a supplier to see every check with its source, the exact quote, and its dates.</span></li>
+    <li class="flex gap-1.5"><i data-lucide="arrow-down-wide-narrow" class="h-3.5 w-3.5 shrink-0 mt-px"></i><span>Ranking uses the <strong class="font-medium text-slate-600 dark:text-slate-300">quoted</strong> price from each supplier's reply. The listed price is only a hint before quotes arrive.</span></li>
+    <li class="flex gap-1.5"><i data-lucide="calculator" class="h-3.5 w-3.5 shrink-0 mt-px"></i><span>Transport and landed cost are <em>estimates</em> from the client's own rates, not sourced facts.</span></li>
+  </ul>
   {% endif %}
 </section>
+{% endif %}

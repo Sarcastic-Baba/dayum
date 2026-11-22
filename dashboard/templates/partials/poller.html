@@ -1,0 +1,3 @@
+{# Polls every 3 s until DONE/HELD. Paused while a drawer or dialog is open. #}
+<div id="poller" {% if oob %}hx-swap-oob="true"{% endif %} aria-hidden="true"
+     {% if poll %}hx-get="/requests/{{ r.request_id }}/live?v={{ version }}" hx-trigger="every 3s [!window.bsPause]" hx-swap="none"{% endif %}></div>

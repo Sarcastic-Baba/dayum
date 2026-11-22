@@ -5,8 +5,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+for path in (ROOT, ROOT / "tests"):  # engine tests import helpers like `fixture_data` directly
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
 
 from tests import fixtures  # noqa: E402
 from tests.fakedb import FakeDb  # noqa: E402
