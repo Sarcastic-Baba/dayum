@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Requests{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">Sourcing requests</h1>
+    <p class="muted text-sm mt-1 max-w-2xl">Each request finds verified manufacturers, requests quotes after your approval, compares them and recommends an order — with a source for every fact.</p>
+  </div>
+  {% if user.can_approve %}
+  <a href="/requests/new" class="btn-primary"><i data-lucide="plus" class="h-4 w-4"></i>New request</a>
+  {% endif %}
+</div>
+
+{% if not requests %}
+<div class="card p-10 sm:p-14 text-center">
+  <span class="inline-grid place-items-center h-14 w-14 rounded-full bg-accent-50 dark:bg-accent-600/20 text-accent-600 mb-4"><i data-lucide="package-search" class="h-7 w-7"></i></span>
+  <h2 class="text-lg font-semibold">No requests yet</h2>
+  <p class="muted text-sm mt-1 max-w-md mx-auto">Start one like “50,000 five-ply boxes a month for our Gurgaon warehouse”, or phone it in.</p>
+  {% if user.can_approve %}<a href="/requests/new" class="btn-primary mt-6"><i data-lucide="plus" class="h-4 w-4"></i>New request</a>{% endif %}
+</div>
+{% else %}
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900/60 text-left">
+        <tr class="eyebrow">
+          <th scope="col" class="px-4 py-3">Request</th>
+          <th scope="col" class="px-4 py-3">Item</th>
+          <th scope="col" class="px-4 py-3 hidden md:table-cell">Location</th>
+          <th scope="col" class="px-4 py-3">Status</th>
+          <th scope="col" class="px-4 py-3 text-right hidden sm:table-cell">Cost</th>
+          <th scope="col" class="px-4 py-3 text-right hidden lg:table-cell">Last update</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+        {% for r in requests %}
+        {% set color, label = STATUS_STYLE.get(r.status, ('slate', r.status)) %}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-4 py-3 align-top">
+            <a href="/requests/{{ r.request_id }}" class="font-semibold text-accent-700 dark:text-accent-300 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded tabular-nums">{{ r.request_id }}</a>
+            {% if r.is_voice %}<span class="pill ml-1 bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300" title="Requested by phone"><i data-lucide="phone" class="h-3 w-3"></i>Phone</span>{% endif %}
+            <div class="muted text-xs mt-0.5">{{ STATE_LABELS.get(r.state, r.state) }}</div>
+          </td>
+          <td class="px-4 py-3 align-top">
+            <div class="font-medium">{{ r['item'] | capitalize }}</div>
+            {% if r.spec_summary %}<div class="muted text-xs mt-0.5 tabular-nums">{{ r.spec_summary }}</div>{% endif %}
+          </td>
+          <td class="px-4 py-3 align-top hidden md:table-cell">{{ r.location }}</td>
+          <td class="px-4 py-3 align-top"><span class="pill bg-{{ color }}-100 text-{{ color }}-700 dark:bg-{{ color }}-500/15 dark:text-{{ color }}-300">{{ label }}</span></td>
+          <td class="px-4 py-3 align-top text-right tabular-nums hidden sm:table-cell">{{ r.cost_inr | inr }}</td>
+          <td class="px-4 py-3 align-top text-right muted tabular-nums hidden lg:table-cell">{{ r.updated_at | ist }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

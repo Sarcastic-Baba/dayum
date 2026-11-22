@@ -1,0 +1,162 @@
+{# The human gate (DASHBOARD.md §2.3). Re-rendered only when the approvals change, so a form
+   being filled in is never replaced. Approving posts back the fingerprint of the exact email shown. #}
+{% macro letter(a, open_by_default=True) %}
+<article class="rounded-ctl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 shadow-sm overflow-hidden">
+  {% if a.email_body %}
+  <dl class="px-4 py-3 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs grid grid-cols-[4.5rem_1fr] gap-y-1.5">
+    <dt class="muted">To</dt><dd class="break-all font-medium">{{ a.email_to or '—' }}</dd>
+    <dt class="muted">Subject</dt><dd class="font-medium">{{ a.email_subject or '—' }}</dd>
+  </dl>
+  <pre class="px-4 py-4 text-[13px] leading-relaxed whitespace-pre-wrap break-words font-sans text-slate-800 dark:text-slate-200 max-h-[32rem] overflow-y-auto">{{ a.email_body }}</pre>
+  {% else %}
+  <p class="px-4 py-3 text-sm text-amber-700 dark:text-amber-300 flex gap-2"><i data-lucide="file-question" class="h-4 w-4 shrink-0 mt-0.5"></i>No draft yet — it cannot be approved until the exact email text is here to review.</p>
+  {% endif %}
+</article>
+{% endmacro %}
+
+{% set rfqs = r.actions | selectattr('type', 'equalto', 'send_rfq') | selectattr('status', 'equalto', 'pending_approval') | list %}
+{% set pos = r.actions | selectattr('type', 'equalto', 'send_po') | selectattr('status', 'equalto', 'pending_approval') | list %}
+{% set decided = r.actions | rejectattr('status', 'equalto', 'pending_approval') | list %}
+{% set can = user and user.can_approve %}
+
+<div id="approvals" {% if oob %}hx-swap-oob="true"{% endif %} class="space-y-6 scroll-mt-20">
+{% if rfqs %}
+{% set ready = rfqs | selectattr('email_body') | list %}
+<section class="card p-5 sm:p-6 ring-2 ring-accent-500/30" aria-labelledby="rfq-title"
+         x-data='{ ticked: {{ ready | map(attribute="id") | map("string") | list | tojson }}, total: {{ ready | length }}, current: {{ (rfqs[0].id | string) | tojson }}, rejectAll: false }'>
+  <header class="flex flex-wrap items-start gap-3">
+    <span class="grid place-items-center h-10 w-10 shrink-0 rounded-full bg-accent-50 dark:bg-accent-600/20 text-accent-600"><i data-lucide="send" class="h-5 w-5"></i></span>
+    <div class="min-w-0 flex-1">
+      <h2 id="rfq-title" class="text-lg font-semibold">Approve quote requests</h2>
+      <p class="muted text-sm">Ticked suppliers are emailed exactly the text shown (team test inbox only). Unticked ones are rejected with your reason. Every decision is recorded with your name.</p>
+    </div>
+  </header>
+  {% if not can %}
+  <p class="mt-4 rounded-ctl bg-slate-100 dark:bg-slate-800 text-sm px-3 py-2 flex items-center gap-2"><i data-lucide="lock" class="h-4 w-4"></i>Read-only account — you can read the drafts; only the approver can decide.</p>
+  {% endif %}
+
+  <form method="post" action="/requests/{{ r.request_id }}/rfq-decisions" class="mt-5 grid lg:grid-cols-[minmax(0,18rem)_1fr] gap-5">
+    {# Left: one row per supplier — tick to send, click to preview. #}
+    <fieldset class="space-y-2">
+      <legend class="eyebrow mb-2">Suppliers ({{ rfqs | length }})</legend>
+      {% for a in rfqs %}
+      <div class="flex items-center gap-3 rounded-ctl border px-3 py-2.5 transition"
+           :class="current === '{{ a.id }}' ? 'border-accent-500 bg-accent-50/60 dark:bg-accent-600/10' : 'border-slate-200 dark:border-slate-800'">
+        <input type="checkbox" name="approve" value="{{ a.id }}" id="rfq-{{ a.id }}" x-model="ticked" {{ 'disabled' if not can or not a.email_body }}
+               class="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-accent-600 focus:ring-accent-500">
+        <input type="hidden" name="fingerprint_{{ a.id }}" value="{{ a.fingerprint }}">
+        <label for="rfq-{{ a.id }}" class="min-w-0 flex-1 text-sm font-medium truncate">{{ a.supplier_name }}</label>
+        <button type="button" class="btn-ghost !p-1.5 text-xs" @click="current = '{{ a.id }}'" :aria-pressed="current === '{{ a.id }}'" aria-label="Preview the email to {{ a.supplier_name }}">
+          <i data-lucide="eye" class="h-4 w-4"></i>
+        </button>
+      </div>
+      {% endfor %}
+    </fieldset>
+
+    {# Right: the letter for the selected supplier. #}
+    <div class="min-w-0">
+      {% for a in rfqs %}
+      <div x-show="current === '{{ a.id }}'" {% if not loop.first %}x-cloak{% endif %}>
+        <p class="eyebrow mb-2">Email to {{ a.supplier_name }}</p>
+        {{ letter(a) }}
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if can %}
+    <div class="lg:col-span-2 space-y-3 border-t border-slate-100 dark:border-slate-800 pt-4">
+      <div x-show="ticked.length < total" x-cloak>
+        <label for="rfq-reason" class="label">Reason for rejecting the unticked supplier<span x-show="total - ticked.length !== 1">s</span> <span class="text-rose-600" aria-hidden="true">*</span></label>
+        <textarea id="rfq-reason" name="reason" rows="2" class="input" :required="ticked.length < total" placeholder="e.g. Already a client supplier on a separate contract"></textarea>
+      </div>
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        <button type="button" class="btn-ghost text-rose-600 dark:text-rose-400 mr-auto" @click="rejectAll = true; window.bsPause = true">Reject all…</button>
+        <span class="muted text-sm tabular-nums" x-text="ticked.length + ' of ' + total + ' selected'"></span>
+        <button class="btn-primary" :disabled="ticked.length === 0"><i data-lucide="send" class="h-4 w-4"></i>Approve selected<span x-show="ticked.length < total"> &amp; reject the rest</span></button>
+      </div>
+    </div>
+    {% endif %}
+  </form>
+
+  {% if can %}
+  <div x-show="rejectAll" x-cloak class="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="rejall-title">
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="rejectAll = false; window.bsPause = false"></div>
+    <form method="post" action="/requests/{{ r.request_id }}/rfq-decisions" class="relative card p-6 w-full max-w-md space-y-4">
+      <h3 id="rejall-title" class="text-lg font-semibold">Reject all quote requests</h3>
+      <p class="muted text-sm">No supplier will be emailed and the request goes on hold. The reason is recorded with your name.</p>
+      <label for="rejall-reason" class="label">Reason <span class="text-rose-600" aria-hidden="true">*</span></label>
+      <textarea id="rejall-reason" name="reason" rows="3" required class="input" placeholder="Why are these rejected?"></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn-ghost" @click="rejectAll = false; window.bsPause = false">Cancel</button>
+        <button class="btn-danger">Reject all</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% for a in pos %}
+<section class="card p-5 sm:p-6 ring-2 ring-accent-500/30" aria-labelledby="po-title-{{ a.id }}" x-data="{ reject: false }">
+  <header class="flex flex-wrap items-start gap-3">
+    <span class="grid place-items-center h-10 w-10 shrink-0 rounded-full bg-accent-50 dark:bg-accent-600/20 text-accent-600"><i data-lucide="file-signature" class="h-5 w-5"></i></span>
+    <div class="min-w-0 flex-1">
+      <h2 id="po-title-{{ a.id }}" class="text-lg font-semibold">Approve the purchase order — {{ a.supplier_name }}</h2>
+      <p class="muted text-sm">This PO goes out once, exactly as shown, to the team test inbox.</p>
+    </div>
+  </header>
+  <div class="mt-5">{{ letter(a) }}</div>
+  {% if can %}
+  <div class="mt-5 flex flex-wrap justify-end gap-3">
+    <button type="button" class="btn-outline" @click="reject = true; window.bsPause = true"><i data-lucide="x" class="h-4 w-4"></i>Reject…</button>
+    <form method="post" action="/approvals/{{ a.id }}">
+      <input type="hidden" name="request_id" value="{{ r.request_id }}">
+      <input type="hidden" name="decision" value="approve">
+      <input type="hidden" name="fingerprint" value="{{ a.fingerprint }}">
+      <button class="btn-primary" {{ 'disabled' if not a.email_body }}><i data-lucide="check" class="h-4 w-4"></i>Approve &amp; send PO</button>
+    </form>
+  </div>
+  <div x-show="reject" x-cloak class="fixed inset-0 z-50 grid place-items-center p-4" role="dialog" aria-modal="true" aria-labelledby="porej-{{ a.id }}">
+    <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" @click="reject = false; window.bsPause = false"></div>
+    <form method="post" action="/approvals/{{ a.id }}" class="relative card p-6 w-full max-w-md space-y-4">
+      <h3 id="porej-{{ a.id }}" class="text-lg font-semibold">Reject the purchase order</h3>
+      <input type="hidden" name="request_id" value="{{ r.request_id }}">
+      <input type="hidden" name="decision" value="reject">
+      <label for="porej-reason-{{ a.id }}" class="label">Reason <span class="text-rose-600" aria-hidden="true">*</span></label>
+      <textarea id="porej-reason-{{ a.id }}" name="reason" rows="3" required class="input" placeholder="Why is this PO rejected?"></textarea>
+      <div class="flex justify-end gap-2">
+        <button type="button" class="btn-ghost" @click="reject = false; window.bsPause = false">Cancel</button>
+        <button class="btn-danger">Reject PO</button>
+      </div>
+    </form>
+  </div>
+  {% else %}
+  <p class="mt-4 rounded-ctl bg-slate-100 dark:bg-slate-800 text-sm px-3 py-2 flex items-center gap-2"><i data-lucide="lock" class="h-4 w-4"></i>Read-only account — only the approver can decide.</p>
+  {% endif %}
+</section>
+{% endfor %}
+
+{% if decided %}
+<section class="card p-5" aria-labelledby="decided-title">
+  <h2 id="decided-title" class="font-semibold flex items-center gap-2"><i data-lucide="shield-check" class="h-5 w-5 text-accent-600"></i>Decisions</h2>
+  <p class="muted text-sm">Final and read-only. Each shows who decided, when, and why.</p>
+  <ul class="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+    {% for a in decided %}
+    {% set color, word = {'done': ('emerald', 'Sent'), 'approved': ('indigo', 'Approved — sending'), 'skipped': ('rose', 'Rejected')}.get(a.status, ('slate', a.status)) %}
+    <li class="py-3">
+      <details class="group">
+        <summary class="flex flex-wrap items-center gap-x-3 gap-y-1 cursor-pointer list-none rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500">
+          <span class="pill bg-{{ color }}-100 text-{{ color }}-700 dark:bg-{{ color }}-500/15 dark:text-{{ color }}-300">{{ word }}</span>
+          <span class="font-medium text-sm">{{ 'Quote request' if a.type == 'send_rfq' else 'Purchase order' }} → {{ a.supplier_name }}</span>
+          <span class="muted text-xs">{{ a.approved_by or '—' }} · {{ a.approved_at | ist }}{% if a.sent_at %} · sent {{ a.sent_at | ist }}{% endif %}</span>
+          <i data-lucide="chevron-down" class="h-4 w-4 muted ml-auto transition group-open:rotate-180"></i>
+        </summary>
+        {% if a.reason %}<p class="mt-2 text-sm"><span class="font-medium">Reason:</span> {{ a.reason }}</p>{% endif %}
+        <div class="mt-3">{{ letter(a) }}</div>
+      </details>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+</div>

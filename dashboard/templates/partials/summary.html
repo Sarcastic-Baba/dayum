@@ -1,0 +1,15 @@
+{% if r.result_ready and (r.summary or r.assumptions) %}
+<section class="card p-5" aria-labelledby="sum-title">
+  <h2 id="sum-title" class="eyebrow flex items-center gap-1.5"><i data-lucide="sparkles" class="h-3.5 w-3.5"></i>Summary</h2>
+  {% if r.summary %}<p class="mt-2 leading-relaxed">{{ r.summary }}</p>{% endif %}
+  {% if r.assumptions %}
+  <ul class="mt-4 space-y-2" aria-label="Assumptions that need confirmation">
+    {% for a in r.assumptions %}
+    <li class="rounded-ctl border-l-4 border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 text-sm px-3 py-2 flex gap-2">
+      <i data-lucide="circle-help" class="h-4 w-4 shrink-0 mt-0.5"></i><span><span class="font-medium">Needs confirmation:</span> {{ a }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}

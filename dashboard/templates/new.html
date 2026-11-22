@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}New request{% endblock %}
+{% block content %}
+{% macro req() %}<span class="text-rose-600" aria-hidden="true">*</span><span class="sr-only">(required)</span>{% endmacro %}
+<div class="max-w-3xl mx-auto">
+  <a href="/" class="btn-ghost -ml-3 mb-2"><i data-lucide="arrow-left" class="h-4 w-4"></i>Requests</a>
+  <h1 class="text-2xl sm:text-3xl font-semibold tracking-tight">New sourcing request</h1>
+  <p class="muted text-sm mt-1">The sourcing agent finds and verifies manufacturers, then asks you before any email goes out.</p>
+
+  {% if errors %}
+  <div role="alert" class="mt-5 rounded-card border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-4 text-sm text-rose-800 dark:text-rose-200">
+    <p class="font-medium flex items-center gap-2"><i data-lucide="circle-alert" class="h-4 w-4"></i>Please fix the following</p>
+    <ul class="list-disc ml-6 mt-2 space-y-0.5">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/requests" class="card p-5 sm:p-6 mt-6 space-y-7">
+    <input type="hidden" name="request_id" value="{{ request_id }}">
+
+    <fieldset class="grid sm:grid-cols-2 gap-4">
+      <legend class="eyebrow mb-3 sm:col-span-2">What</legend>
+      <div class="sm:col-span-2">
+        <label for="item" class="label">Item {{ req() }}</label>
+        <input id="item" name="item" required class="input" value="{{ values.get('item', 'corrugated box') }}">
+      </div>
+      <div>
+        <label for="ply" class="label">Ply {{ req() }}</label>
+        <select id="ply" name="ply" required class="input tabular-nums">
+          {% set ply = values.get('ply', '5') | string %}
+          {% for p in ['3', '5', '7', '9'] %}<option value="{{ p }}" {{ 'selected' if p == ply }}>{{ p }}-ply</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <span class="label" id="size-label">Size, inches (L × W × H) {{ req() }}</span>
+        <div class="grid grid-cols-3 gap-2" role="group" aria-labelledby="size-label">
+          <input name="size_l" type="number" min="0.1" step="any" required class="input tabular-nums" placeholder="L" aria-label="Length in inches" value="{{ values.get('size_l', '') }}">
+          <input name="size_w" type="number" min="0.1" step="any" required class="input tabular-nums" placeholder="W" aria-label="Width in inches" value="{{ values.get('size_w', '') }}">
+          <input name="size_h" type="number" min="0.1" step="any" required class="input tabular-nums" placeholder="H" aria-label="Height in inches" value="{{ values.get('size_h', '') }}">
+        </div>
+      </div>
+      <div>
+        <label for="material" class="label">Material <span class="muted font-normal">(optional)</span></label>
+        <input id="material" name="material" class="input" placeholder="kraft" value="{{ values.get('material', '') }}">
+      </div>
+      <div>
+        <label for="printing" class="label">Printing <span class="muted font-normal">(optional)</span></label>
+        <input id="printing" name="printing" class="input" placeholder="none" value="{{ values.get('printing', '') }}">
+      </div>
+    </fieldset>
+
+    <fieldset class="grid sm:grid-cols-2 gap-4">
+      <legend class="eyebrow mb-3 sm:col-span-2">How many, where, when</legend>
+      <div>
+        <label for="quantity_per_month" class="label">Quantity per month {{ req() }}</label>
+        <input id="quantity_per_month" name="quantity_per_month" type="number" min="1" step="1" inputmode="numeric" required class="input tabular-nums" placeholder="50000" value="{{ values.get('quantity_per_month', '') }}">
+      </div>
+      <div>
+        <label for="delivery_location" class="label">Delivery location {{ req() }}</label>
+        <input id="delivery_location" name="delivery_location" required class="input" placeholder="Gurgaon, Haryana" value="{{ values.get('delivery_location', '') }}">
+      </div>
+      <div>
+        <label for="needed_by" class="label">Needed by <span class="muted font-normal">(optional)</span></label>
+        <input id="needed_by" name="needed_by" type="date" class="input tabular-nums" value="{{ values.get('needed_by', '') }}">
+      </div>
+      <div>
+        <label for="budget_inr_per_unit" class="label">Budget per box, ₹ <span class="muted font-normal">(optional)</span></label>
+        <input id="budget_inr_per_unit" name="budget_inr_per_unit" type="number" min="0.01" step="0.01" class="input tabular-nums" placeholder="—" value="{{ values.get('budget_inr_per_unit', '') }}">
+      </div>
+    </fieldset>
+
+    <p class="text-xs muted flex gap-1.5"><i data-lucide="info" class="h-3.5 w-3.5 shrink-0 mt-0.5"></i>Optional fields left blank are listed as assumptions to confirm — nothing is guessed.</p>
+
+    <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+      <a href="/" class="btn-ghost">Cancel</a>
+      <button class="btn-primary"><i data-lucide="play" class="h-4 w-4"></i>Start sourcing</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{# One clear sentence about what is happening now and who it is waiting for. #}
+{% set can = user and user.can_approve %}
+{% set rfq_pending = r.actions | selectattr('type', 'equalto', 'send_rfq') | selectattr('status', 'equalto', 'pending_approval') | list %}
+{% set po_pending = r.actions | selectattr('type', 'equalto', 'send_po') | selectattr('status', 'equalto', 'pending_approval') | list %}
+
+{% if r.state == 'HELD' %}
+<section role="alert" class="rounded-card border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-4 sm:p-5 flex gap-3">
+  <span class="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300"><i data-lucide="octagon-pause" class="h-5 w-5"></i></span>
+  <div class="min-w-0">
+    {% if r.status == 'no_verified_supplier' %}
+    <h2 class="font-semibold text-rose-900 dark:text-rose-100">No supplier could be verified — by design, none is recommended</h2>
+    <p class="mt-1 text-sm text-rose-800 dark:text-rose-200">Recommending an unverified supplier would be worse than recommending none. Each excluded supplier and the reason is listed below.</p>
+    {% else %}
+    <h2 class="font-semibold text-rose-900 dark:text-rose-100">On hold</h2>
+    {% endif %}
+    {% if r.held_reason %}<p class="mt-1.5 text-sm text-rose-800 dark:text-rose-200"><span class="font-medium">Reason:</span> {{ r.held_reason }}</p>{% endif %}
+  </div>
+</section>
+
+{% elif not r.result_ready %}
+<section role="status" class="card p-4 sm:p-5 flex items-center gap-3">
+  <span class="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-accent-50 dark:bg-accent-600/20 text-accent-600 animate-pulse">
+    <i data-lucide="hourglass" class="h-4 w-4"></i>
+  </span>
+  <div>
+    <h2 class="font-semibold">Queued — waiting for the sourcing agent to pick this up</h2>
+    <p class="muted text-sm">This page updates by itself as soon as the agent starts working.</p>
+  </div>
+</section>
+
+{% elif rfq_pending or po_pending %}
+<section role="status" class="rounded-card border border-accent-200 dark:border-accent-600/40 bg-accent-50 dark:bg-accent-600/10 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+  <span class="hidden sm:grid place-items-center h-9 w-9 shrink-0 rounded-full bg-accent-100 dark:bg-accent-600/30 text-accent-700 dark:text-accent-100"><i data-lucide="hand" class="h-4 w-4"></i></span>
+  <div class="min-w-0 flex-1">
+    <h2 class="font-semibold text-accent-900 dark:text-accent-50">
+      {% if can %}Waiting for your approval{% else %}Waiting for the approver{% endif %}
+    </h2>
+    <p class="text-sm text-accent-800 dark:text-accent-100">
+      {% if rfq_pending %}{{ rfq_pending | length }} quote request{{ 's' if rfq_pending | length != 1 }} ready to send{% else %}The purchase order is ready to send{% endif %}. Nothing is emailed until a person approves it.
+    </p>
+  </div>
+  <a href="#approvals" class="btn-primary w-full sm:w-auto">{% if can %}Review and decide{% else %}See the drafts{% endif %}<i data-lucide="arrow-down" class="h-4 w-4"></i></a>
+</section>
+
+{% elif r.state == 'WAIT_QUOTES' %}
+<section role="status" class="rounded-card border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/40 p-4 sm:p-5 flex items-center gap-3">
+  <span class="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300"><i data-lucide="mail-question" class="h-4 w-4"></i></span>
+  <div>
+    <h2 class="font-semibold text-amber-900 dark:text-amber-100">Waiting for supplier replies</h2>
+    <p class="text-sm text-amber-800 dark:text-amber-200">RFQs went out{% if r.rfqs_sent_at %} {{ r.rfqs_sent_at | ist }}{% endif %}. Quotes are read and compared automatically as they arrive.</p>
+  </div>
+</section>
+
+{% elif r.state == 'DONE' %}
+<section role="status" class="rounded-card border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-950/40 p-4 sm:p-5 flex items-center gap-3">
+  <span class="grid place-items-center h-9 w-9 shrink-0 rounded-full bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300"><i data-lucide="circle-check-big" class="h-5 w-5"></i></span>
+  <div>
+    <h2 class="font-semibold text-emerald-900 dark:text-emerald-100">Done — purchase order sent</h2>
+    <p class="text-sm text-emerald-800 dark:text-emerald-200">Every email in this run went out exactly once, after approval.</p>
+  </div>
+</section>
+{% endif %}

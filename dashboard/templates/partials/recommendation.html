@@ -1,0 +1,56 @@
+{# Two shapes (DASHBOARD.md §2.2): stage "shortlist" (who gets RFQs) and stage "quotes" (the order). #}
+{% set rec = r.recommendation %}
+{% if rec %}
+{% macro supplier(sid) %}{% if sid %}<button type="button" class="font-semibold text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded" @click='open({{ sid | tojson }})'>{{ r.names.get(sid, sid) }}</button>{% else %}—{% endif %}{% endmacro %}
+<section class="card p-5 sm:p-6" aria-labelledby="rec-title">
+  <div class="flex flex-wrap items-center gap-2">
+    <h2 id="rec-title" class="text-lg font-semibold flex items-center gap-2"><i data-lucide="award" class="h-5 w-5 text-accent-600"></i>Recommendation</h2>
+    <span class="pill bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ 'Based on quotes received' if rec.get('stage') == 'quotes' else 'Shortlist — before quotes' }}</span>
+  </div>
+
+  {% if rec.get('stage') == 'quotes' %}
+  <div class="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="rounded-card bg-accent-600 text-white p-4">
+      <p class="text-xs font-semibold uppercase tracking-wide text-accent-100">Primary supplier</p>
+      <p class="mt-1 text-lg">{{ supplier(rec.get('primary')) }}</p>
+    </div>
+    <div class="rounded-card bg-slate-50 dark:bg-slate-800/60 p-4">
+      <p class="eyebrow">Backup</p>
+      <p class="mt-1 text-lg">{{ supplier(rec.get('backup')) }}</p>
+    </div>
+    <div class="rounded-card bg-slate-50 dark:bg-slate-800/60 p-4">
+      <p class="eyebrow">Trial order</p>
+      <p class="mt-1 text-lg font-semibold tabular-nums">{{ rec.get('trial_order_qty') | num }} <span class="text-sm font-normal muted">boxes</span></p>
+    </div>
+    <div class="rounded-card bg-slate-50 dark:bg-slate-800/60 p-4">
+      <p class="eyebrow">Then monthly</p>
+      <p class="mt-1 text-lg font-semibold tabular-nums">{{ rec.get('full_monthly_qty') | num }} <span class="text-sm font-normal muted">boxes</span></p>
+    </div>
+  </div>
+  {% else %}
+  {% set targets = rec.get('send_rfqs_to') or r.shortlist %}
+  <div class="mt-4">
+    <p class="eyebrow">Send quote requests to</p>
+    {% if targets %}
+    <ul class="mt-2 flex flex-wrap gap-2">
+      {% for sid in targets %}
+      <li class="rounded-full bg-accent-50 dark:bg-accent-600/15 text-accent-800 dark:text-accent-100 px-3 py-1 text-sm flex items-center gap-1.5"><i data-lucide="building-2" class="h-3.5 w-3.5"></i>{{ supplier(sid) }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="mt-1 muted text-sm">No supplier is eligible yet.</p>{% endif %}
+    <p class="mt-3 muted text-sm">The final choice is made on the prices in their replies, not on listed prices.</p>
+  </div>
+  {% endif %}
+
+  {% if rec.get('reasoning') %}<p class="mt-4 leading-relaxed">{{ rec.reasoning }}</p>{% endif %}
+  {% if rec.get('caveats') %}
+  <ul class="mt-4 space-y-2" aria-label="Caveats">
+    {% for cv in rec.caveats %}
+    <li class="rounded-ctl border-l-4 border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 text-sm px-3 py-2 flex gap-2">
+      <i data-lucide="triangle-alert" class="h-4 w-4 shrink-0 mt-0.5"></i>{{ cv }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}
