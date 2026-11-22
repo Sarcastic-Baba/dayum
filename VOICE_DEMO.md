@@ -45,7 +45,8 @@ Expected (HTTP 200, ~1–3 s):
 
 Then answer for the same call id (`"query": "yes"`) and the reply is
 *"Your request is registered. Our sourcing agent takes it from here, and you can follow it
-on the BoxSource dashboard."* — `python cli.py status` now lists `VOICE-democall`.
+on the BoxSource dashboard."* — `python cli.py status` now lists a `VOICE-democall-…`
+request (readable call-id prefix plus a hash of the full call id).
 
 How the endpoint behaves:
 - `message.type` other than `tool-calls` (status updates, end-of-call reports) → `200 {}`.

@@ -134,12 +134,37 @@ def test_intake_asks_followups_then_registers_once(server, monkeypatch):
     assert say("yes") == cfg["voice"]["already_registered"]  # a retry can't register twice
 
     db = SQLiteDB(cfg["storage"]["sqlite_path"])
+    rid = voice.request_id_for("call-test-1")
     reqs = db.select("requests")
-    assert [r["request_id"] for r in reqs] == ["VOICE-calltest"]
+    assert [r["request_id"] for r in reqs] == [rid] and rid.startswith("VOICE-calltest-")
     raw = reqs[0]["input_json"]
     assert raw["quantity_per_month"] == 50000 and raw["spec"] == {"ply": 5, "size_in": [18, 12, 12]}
+    assert raw["call_id"] == "call-test-1"
     assert reqs[0]["state"] == "RECEIVED"  # the sourcing agent takes over from here
-    assert db.select("costs", {"request_id": "VOICE-calltest"})  # recorded after the row existed
+    assert db.select("costs", {"request_id": rid})  # recorded after the row existed
+
+
+def test_registered_is_only_said_for_a_row_this_call_owns(server, monkeypatch):
+    """Regression: call ids sharing a prefix collided on one id, and the second caller was
+    told 'registered' although nothing was written."""
+    vs, client, cfg = server
+    monkeypatch.setattr(voice.llm, "extract", FakeLLM())
+    full = "50,000 5 ply corrugated boxes a month, 18 by 12 by 12 inches, to Gurgaon"
+    for call in ("curl-call-003", "curl-call-005"):
+        assert result_of(client.post("/vapi/tool", json=payload(full, call_id=call))).startswith("Let me confirm")
+        assert result_of(client.post("/vapi/tool", json=payload("yes", call_id=call))) == cfg["voice"]["registered"]
+    db = SQLiteDB(cfg["storage"]["sqlite_path"])
+    owners = sorted(r["input_json"]["call_id"] for r in db.select("requests"))
+    assert owners == ["curl-call-003", "curl-call-005"]  # two calls, two requests
+
+    # A stale row from another call already holds this call's id: take a suffixed id.
+    voice.SESSIONS.clear()
+    clash = voice.request_id_for("curl-call-007")
+    db.insert("requests", {"request_id": clash, "input_json": {"call_id": "someone-else"}})
+    client.post("/vapi/tool", json=payload(full, call_id="curl-call-007"))
+    client.post("/vapi/tool", json=payload("yes", call_id="curl-call-007"))
+    mine = [r for r in db.select("requests") if r["input_json"].get("call_id") == "curl-call-007"]
+    assert [r["request_id"] for r in mine] == [f"{clash}-2"]
 
 
 def test_status_or_approval_questions_are_redirected(server, monkeypatch):

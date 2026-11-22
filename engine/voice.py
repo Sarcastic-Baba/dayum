@@ -11,10 +11,12 @@ asked for again. One phone call registers one request (VOICE-<call id>), so a re
 tool call can't duplicate it.
 """
 
+import hashlib
 import json
 import logging
 import os
 import re
+import secrets
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -190,27 +192,42 @@ def read_back(sp):
 # ---- registering the request with the existing agent ---------------------------------------
 
 def request_id_for(call_key):
-    if call_key == "no-call-id":
-        return f"VOICE-{datetime.now(timezone.utc):%m%d%H%M%S}"
-    return "VOICE-" + re.sub(r"[^A-Za-z0-9]", "", call_key)[:8]
+    """Readable prefix plus a hash of the full call id: two calls can never share an id."""
+    if call_key == "no-call-id":  # no stable identity to key on; just be unique
+        return f"VOICE-{datetime.now(timezone.utc):%m%d%H%M%S}-{secrets.token_hex(2)}"
+    short = re.sub(r"[^A-Za-z0-9]", "", call_key)[:8]
+    return f"VOICE-{short}-{hashlib.sha256(call_key.encode()).hexdigest()[:6]}"
 
 
 def register(cfg, db, s, call_key):
-    """Hand the confirmed spec to the agent exactly as the dashboard would: a request row."""
+    """Hand the confirmed spec to the agent exactly as the dashboard would: a request row.
+    "Registered" is only ever said for a row this call actually owns."""
     sp = s["pending"]
-    rid = s["request_id"] or request_id_for(call_key)
     spec = {k: v for k, v in {"ply": sp.ply, "size_in": sp.size_in, "material": sp.material,
                               "printing": sp.printing}.items() if v is not None}
-    raw = {"request_id": rid, "item": sp.item, "spec": spec,
-           "quantity_per_month": sp.quantity_per_month, "delivery_location": sp.delivery_location,
-           "needed_by": sp.needed_by, "budget_inr_per_unit": None,
-           "channel": "voice", "caller_words": " ".join(s["words"])}
-    won = db.insert("requests", {"request_id": rid, "input_json": raw}, conflict=["request_id"])
+    raw = {"item": sp.item, "spec": spec, "quantity_per_month": sp.quantity_per_month,
+           "delivery_location": sp.delivery_location, "needed_by": sp.needed_by,
+           "budget_inr_per_unit": None, "channel": "voice", "call_id": call_key,
+           "caller_words": " ".join(s["words"])}
+    base = rid = s["request_id"] or request_id_for(call_key)
+    for n in range(2, 7):
+        raw["request_id"] = rid
+        won = db.insert("requests", {"request_id": rid, "input_json": raw}, conflict=["request_id"])
+        if won:
+            break
+        owner = (db.select("requests", {"request_id": rid})[0]["input_json"] or {}).get("call_id")
+        if owner == call_key and call_key != "no-call-id":
+            break  # this call registered it already (a retried tool call)
+        rid = f"{base}-{n}"  # another call owns that id: never claim its row
+    else:
+        return TROUBLE  # no free id found; don't tell the caller it worked
     tin, tout = s["tokens"]
     if won and (tin or tout):  # the request row exists now, so the cost row can reference it
         ledger.record_cost(db, rid, "voice_intake", "llm", tin + tout,
                            ledger.llm_cost_inr(cfg, tin, tout))
     s.update(request_id=rid, pending=None, tokens=[0, 0])
+    if call_key == "no-call-id":
+        SESSIONS.pop(call_key, None)  # the next anonymous caller starts a fresh session
     return cfg["voice"]["registered"]
 
 
