@@ -5,7 +5,8 @@ in their RFQ replies, normalized to ex-GST per unit, plus the estimated transpor
 
 import math
 
-ELIGIBILITY = ("manufacturer", "real_active", "spec_match", "fraud_risk")
+STRICT = {"must_pass": ["manufacturer", "real_active", "spec_match", "fraud_risk"],
+          "must_not_fail": []}
 
 
 def _checks(db, request_id):
@@ -13,26 +14,44 @@ def _checks(db, request_id):
             for c in db.select("checks", {"request_id": request_id})}
 
 
-def eligibility(db, request_id):
-    """-> (eligible candidates, {supplier_id: reason it is not eligible})"""
-    checks = _checks(db, request_id)
+def _rules(cfg):
+    return (cfg or {}).get("eligibility") or STRICT
+
+
+def eligibility(db, request_id, cfg=None):
+    """-> (eligible candidates, {supplier_id: plain-English reason it is not eligible}).
+    config.yaml eligibility: must_pass checks must pass; must_not_fail checks may be
+    cannot_verify (shown as a caveat) but a fail — a sourced red flag — excludes."""
+    rules, checks = _rules(cfg), _checks(db, request_id)
     ok, why_not = [], {}
     for c in db.select("candidates", {"request_id": request_id}, order=["supplier_id"]):
         sid = c["supplier_id"]
         if c["merged_into"]:
             why_not[sid] = f"duplicate of {c['merged_into']}"
             continue
-        failing = [f"{n}={checks.get((sid, n), {}).get('result', 'missing')}"
-                   for n in ELIGIBILITY if checks.get((sid, n), {}).get("result") != "pass"]
+        res = lambda n: checks.get((sid, n), {}).get("result", "missing")  # noqa: E731
+        failing = ([f"{n} {res(n)}" for n in rules["must_pass"] if res(n) != "pass"]
+                   + [f"{n} fail" for n in rules["must_not_fail"] if res(n) == "fail"])
         if failing:
-            why_not[sid] = "not eligible: " + ", ".join(failing)
+            why_not[sid] = "not eligible: " + ", ".join(failing).replace("_", " ")
         else:
             ok.append(c)
     return ok, why_not
 
 
-def shortlist(db, request_id):
-    eligible, why_not = eligibility(db, request_id)
+def unverified_caveats(db, request_id, cfg, ids, names):
+    """Caveats for eligible suppliers whose must_not_fail checks came back cannot_verify."""
+    checks, out = _checks(db, request_id), []
+    for n in _rules(cfg)["must_not_fail"]:
+        who = [names.get(s, s) for s in ids if checks.get((s, n), {}).get("result") == "cannot_verify"]
+        if who:
+            out.append(f"{n.replace('_', ' ').capitalize()} could not be verified for "
+                       f"{', '.join(who)} (no access to an authoritative registry); no red flag found.")
+    return out
+
+
+def shortlist(db, request_id, cfg=None):
+    eligible, why_not = eligibility(db, request_id, cfg)
 
     def order(c):
         d = c["data_json"] or {}

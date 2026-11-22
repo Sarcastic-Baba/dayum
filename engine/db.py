@@ -260,6 +260,16 @@ class SQLiteDB:
             list(row.values()))
         return cur.rowcount == 1
 
+    def insert_many(self, table, rows):
+        """Plain insert of rows that share the same columns (one statement)."""
+        if not rows:
+            return
+        rows = [self._enc(r) for r in rows]
+        cols = list(rows[0])
+        self.conn.executemany(
+            f"INSERT INTO {table} ({','.join(cols)}) VALUES ({','.join('?' * len(cols))})",
+            [[r[c] for c in cols] for r in rows])
+
     def upsert(self, table, row, conflict):
         row = self._enc(row)
         sets = ",".join(f"{c}=excluded.{c}" for c in row if c not in conflict)
@@ -336,6 +346,12 @@ class SupabaseDB:
         r = self._req("POST", table, json=self._enc(row), params=params,
                       headers={"Prefer": prefer})
         return len(r.json()) == 1
+
+    def insert_many(self, table, rows):
+        """One round trip for many rows (PostgREST bulk insert; same columns in every row)."""
+        if rows:
+            self._req("POST", table, json=[self._enc(r) for r in rows],
+                      headers={"Prefer": "return=minimal"})
 
     def upsert(self, table, row, conflict):
         self._req("POST", table, json=self._enc(row), params={"on_conflict": ",".join(conflict)},

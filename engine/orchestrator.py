@@ -82,7 +82,7 @@ def h_found(ctx):
 
 
 def h_checked(ctx):
-    sl, why_not = rank.shortlist(ctx.db, ctx.rid)
+    sl, why_not = rank.shortlist(ctx.db, ctx.rid, ctx.cfg)
     names = ctx.names()
     output.refresh(ctx.db, ctx.cfg, ctx.rid, shortlist=sl, not_eligible=[
         {"supplier_id": s, "name": names.get(s), "reason": r} for s, r in why_not.items()])
@@ -101,9 +101,11 @@ def h_shortlisted(ctx):
         summary=(f"{len(sl)} verified manufacturer(s) shortlisted: "
                  f"{', '.join(names[s] for s in sl)}. RFQs drafted and waiting for approval."),
         recommendation={"stage": "shortlist", "send_rfqs_to": sl,
-                        "reasoning": "Every shortlisted supplier passed the manufacturer, "
-                                     "real_active, spec_match and fraud_risk checks.",
-                        "caveats": ["Not yet ranked: ranking waits for the quotes in RFQ replies."]})
+                        "reasoning": "Every shortlisted supplier passed: " + ", ".join(
+                            n.replace("_", " ") for n in rank._rules(ctx.cfg)["must_pass"])
+                        + "; none has a sourced red flag.",
+                        "caveats": ["Not yet ranked: ranking waits for the quotes in RFQ replies."]
+                        + rank.unverified_caveats(ctx.db, ctx.rid, ctx.cfg, sl, names)})
     return "RECOMMENDED"
 
 
@@ -214,6 +216,8 @@ def h_quotes_received(ctx):
                                           "rank": r["rank"]})
     names = ctx.names()
     rec = rank.recommendation(ctx.cfg, ctx.spec, ranked, unranked, names)
+    rec["caveats"] += rank.unverified_caveats(ctx.db, ctx.rid, ctx.cfg,
+                                              [r["supplier_id"] for r in ranked[:2]], names)
     if not ranked:
         output.refresh(ctx.db, ctx.cfg, ctx.rid, recommendation={**rec, "stage": "quotes"})
         return _hold(ctx, "quotes came back but none is comparable; see recommendation caveats")

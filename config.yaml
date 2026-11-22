@@ -39,9 +39,16 @@ email:
   inbox_folder: INBOX
   reply_lookback_days: 3
 
-sources:
-  discovery: gemini                   # gemini (grounded search) | crustdata
-  llm: gemini
+eligibility:                          # which checks decide whether a supplier can get an RFQ
+  must_pass: [manufacturer, spec_match, real_active]
+  must_not_fail: [fraud_risk]         # team decision 22 Nov: GST/MCA can't be read, so cannot_verify
+                                      # is allowed (shown as a caveat); a sourced red flag excludes.
+                                      # Strict mode: move fraud_risk into must_pass.
+
+discovery:                            # Crustdata company search (engine/sources.py)
+  country: IND
+  query: "{item} manufacturer {location}"
+  not_own_site: [share.google, indiamart, justdial, tradeindia, exportersindia, facebook.com, linkedin.com]
 
 llm:                                  # engine-side extraction (free-text requests from the dashboard)
   models: [gemini-flash-lite-latest]  # one model: accurate in testing, and the ledger sees every call

@@ -26,7 +26,11 @@ def run(until_idle=False, interval=2.0, max_cycles=None):
     """until_idle: return once every request is waiting or finished (used by tests/CLI)."""
     n = 0
     while True:
-        states = cycle()
+        try:
+            states = cycle()
+        except Exception as e:  # noqa: BLE001 — a network blip must not kill the worker
+            print(f"cycle failed, retrying: {type(e).__name__}: {e}", flush=True)
+            states = {"_": "error"}
         n += 1
         idle = all(s in TERMINAL or s in WAITING for s in states.values())
         if (until_idle and idle) or (max_cycles and n >= max_cycles):

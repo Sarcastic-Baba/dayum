@@ -3,7 +3,15 @@ the voice extractor and its no-guess guard. The LLM is a fake here: no network c
 
 import yaml
 
-from engine import llm, orchestrator
+import pytest
+
+from engine import llm, orchestrator, sources
+
+
+@pytest.fixture(autouse=True)
+def offline_discovery(monkeypatch):
+    """No network: discovery finds nothing, so these requests end no_verified_supplier."""
+    monkeypatch.setattr(sources, "search_companies", lambda ctx, query, limit: [])
 from engine.config import load_config
 from engine.db import SQLiteDB
 from engine.transport import FileTransport
@@ -45,7 +53,7 @@ def test_free_text_request_is_parsed_without_guessing(tmp_path, monkeypatch):
     assert "quantity_per_month not given — needs confirmation" in row["result_json"]["assumptions"]
     assert db.select("costs", {"request_id": "WEB-T1", "step": "parse_spec"})  # call is in the ledger
     assert row["result_json"]["limits"] == cfg["limits"]        # for the dashboard's progress bars
-    assert row["state"] == "HELD" and row["status"] == "no_verified_supplier"  # discovery is a stub
+    assert row["state"] == "HELD" and row["status"] == "no_verified_supplier"  # nothing discovered
 
 
 def test_structured_request_needs_no_llm(tmp_path, monkeypatch):
