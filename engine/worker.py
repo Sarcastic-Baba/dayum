@@ -4,6 +4,7 @@ Runs on the laptop for the demo. Kill it at any moment and start it again — it
 from the database, and every action still happens exactly once.
 """
 
+import os
 import time
 
 from .config import load_config
@@ -15,9 +16,10 @@ from .transport import open_transport
 def cycle():
     cfg = load_config()  # reloaded every cycle: a config change applies without a restart
     db, transport = open_db(cfg), open_transport(cfg)
+    only = os.environ.get("BOXSOURCE_ONLY_PREFIX")  # e.g. tests on the shared database
+    rows = db.select("requests", {"state": ("not_in", sorted(TERMINAL))}, order=["created_at"])
     return {r["request_id"]: advance(db, cfg, transport, r["request_id"])
-            for r in db.select("requests", {"state": ("not_in", sorted(TERMINAL))},
-                               order=["created_at"])}
+            for r in rows if not only or r["request_id"].startswith(only)}
 
 
 def run(until_idle=False, interval=2.0, max_cycles=None):
