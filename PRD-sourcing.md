@@ -268,19 +268,40 @@ Actions: `send_rfq` (one per approved supplier), `send_po` (primary supplier onl
 Canonical schema: `supabase/migrations/*.sql` (**platform-owned**). It already provides, keyed as below:
 `requests` (state + status), `candidates`, `checks`, `evidence`, `steps` (UNIQUE `idem_key`), `approvals` (UNIQUE `request_id,action,supplier_id`; reject needs a reason), `outbox` (PK `idem_key`, the durable send record), `costs`, `pages`, `geo_cache`, `logs`. RLS on; only `service_role` has access.
 
-**To add (engine needs it — request from platform):** a `quotes` table for RFQ replies:
+**To add (engine needs these — platform, please add in a *new* migration; drop-in SQL below):**
+1. `requests.result_json` — the assembled output (§7): summary, recommendation, caveats, held reason. The dashboard renders this; the engine rewrites it after every step that changes it.
+2. A `quotes` table for RFQ replies (exactly-once on receipt via `UNIQUE message_id`).
+
 ```sql
-quotes(
-  id bigint primary key,
-  request_id text, supplier_id text,          -- FK -> candidates
-  rfq_idem_key text references steps(idem_key),
-  message_id text unique,                      -- dedupe received replies exactly-once
-  price_inr_per_unit numeric, currency text, gst_basis text,
-  moq integer, lead_time_days integer, ply integer, size_in text,
-  raw_eml text, source_quote text,             -- exact line in the email = the source
-  received_at timestamptz, parsed_ok boolean
+alter table public.requests add column result_json jsonb;
+
+create table public.quotes (
+  id bigint generated always as identity primary key,
+  request_id text not null,
+  supplier_id text not null,
+  rfq_idem_key text not null references public.steps(idem_key),
+  message_id text not null unique,                 -- dedupe received replies exactly-once
+  price_inr_per_unit numeric check (price_inr_per_unit is null or price_inr_per_unit >= 0),
+  currency text,
+  gst_basis text check (gst_basis in ('ex-GST', 'incl-GST', 'unknown')),
+  moq integer check (moq is null or moq >= 0),
+  lead_time_days integer check (lead_time_days is null or lead_time_days >= 0),
+  ply integer,
+  size_in text,
+  raw_eml text not null,
+  source_quote text,                               -- exact line in the email = the source
+  parsed_ok boolean not null default false,
+  received_at timestamptz not null,
+  foreign key (request_id, supplier_id) references public.candidates
 );
+alter table public.quotes enable row level security;
+revoke all on public.quotes from anon, authenticated;
+grant all on public.quotes to service_role;
 ```
+
+**No new table for the call cache:** the engine caches LLM/search calls as `steps` rows (`idem_key = sha256(request_id:cache:<step>:<input_hash>)`, result in `output_json`, `status='done'`), so restarts never re-pay.
+
+**Write-order rules the engine follows (from the FKs):** `requests` → `candidates` (a merge target before its duplicate) → `checks` / `evidence` / `approvals` → `steps` → `outbox` (needs both a `steps.idem_key` and an `approvals.id`).
 
 ## 15. Config (`config.yaml`)
 ```yaml

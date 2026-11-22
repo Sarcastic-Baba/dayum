@@ -6,7 +6,7 @@
 Build the **hosted surface** a human uses to run BoxSource: the Supabase schema, the FastAPI API, and the Vercel dashboard. The user submits a request, watches the sourcing run fill in, and **approves or rejects the irreversible actions** (sending RFQs, sending the PO). You render and collect; you never compute a verdict or send an email.
 
 ## You own
-- **Supabase**: the project, the schema and all migrations (`supabase/migrations/*.sql`). You own the **canonical schema — it is the contract.** Add the `quotes` table the engine needs (PRD §14). RLS stays on; only `service_role` has access.
+- **Supabase**: the project, the schema and all migrations (`supabase/migrations/*.sql`). You own the **canonical schema — it is the contract.** **Engine needs, as a new migration (drop-in SQL in PRD §14): the `quotes` table and a `requests.result_json` column** (the assembled output the dashboard renders). RLS stays on; only `service_role` has access.
 - **API** (`app.py`, FastAPI on Vercel): `POST /requests` (create a request → `requests` row, `state=RECEIVED`), `GET /requests/{id}` (assemble the full view from all tables), `POST /approvals/{id}` (approve/reject with a typed reason), and the existing `/api/health` + `/api/ready`.
 - **Dashboard** (`dashboard/`): request list; request detail — parsed spec + assumptions, candidate table (rank, classification badge, listed vs **quoted** price, distance, est. landed cost), each candidate expanding to its checks (green/red/grey) with evidence (fact, quote, link, date), recommendation + caveats, pending approvals (per-supplier RFQ tick-boxes + email preview, PO preview, approve/reject), cost + time, action log.
 - **Auth** and **Vercel deploy** (env vars, build, preview → prod).
