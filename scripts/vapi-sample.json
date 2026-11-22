@@ -1,0 +1,18 @@
+{
+  "message": {
+    "type": "tool-calls",
+    "call": { "id": "demo-call-001" },
+    "toolCallList": [
+      {
+        "id": "call_abc",
+        "type": "function",
+        "function": {
+          "name": "ask_backend_agent",
+          "arguments": {
+            "query": "I need 50,000 5 ply corrugated boxes a month, 18 by 12 by 12 inches, delivered to our Gurgaon warehouse"
+          }
+        }
+      }
+    ]
+  }
+}

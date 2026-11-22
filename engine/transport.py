@@ -107,9 +107,11 @@ class SmtpImapTransport:
 
 
 def open_transport(cfg):
+    from .config import resolve
+
     e = cfg["email"]
     if e["transport"] == "file":
-        return FileTransport(e["outbox_dir"], e["inbox_dir"])
+        return FileTransport(resolve(cfg, e["outbox_dir"]), resolve(cfg, e["inbox_dir"]))
     if e["transport"] == "smtp":
         return SmtpImapTransport(cfg)
     raise ValueError(f"unknown email transport {e['transport']!r}")

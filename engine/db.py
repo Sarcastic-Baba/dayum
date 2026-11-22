@@ -322,9 +322,11 @@ class SupabaseDB:
 
 
 def open_db(cfg):
+    from .config import resolve
+
     backend = cfg["storage"]["backend"]
     if backend == "sqlite":
-        return SQLiteDB(cfg["storage"]["sqlite_path"])
+        return SQLiteDB(resolve(cfg, cfg["storage"]["sqlite_path"]))
     if backend == "supabase":
         return SupabaseDB(os.environ["SUPABASE_URL"], os.environ["SUPABASE_SECRET_KEY"])
     raise ValueError(f"unknown storage backend {backend!r}")

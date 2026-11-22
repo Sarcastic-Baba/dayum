@@ -5,6 +5,7 @@ time a human spends approving does not count against the limit."""
 import json
 from pathlib import Path
 
+from .config import resolve
 from .steps import now_iso
 
 
@@ -30,7 +31,7 @@ def log_step(db, cfg, request_id, step, status, duration_ms=0, cost_inr=0.0,
     if detail:
         line["detail"] = detail
     db.insert("logs", {"request_id": request_id, "level": level, "message": json.dumps(line)})
-    path = cfg.get("log_path")
+    path = resolve(cfg, cfg.get("log_path"))
     if path:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:

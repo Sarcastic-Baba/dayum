@@ -7,6 +7,7 @@ requests and records approvals in Supabase; the worker is the same either way.
   python cli.py reject  REQ --action send_rfq --supplier sup_01 --approver "Name" --reason "..."
   python cli.py show REQ [--kickoff]
   python cli.py status
+  python cli.py voice [--port 8000]   # Vapi phone intake bridge (see VOICE_DEMO.md)
 """
 
 import argparse
@@ -53,8 +54,16 @@ def main(argv=None):
     sh.add_argument("request_id")
     sh.add_argument("--kickoff", action="store_true")
     sub.add_parser("status")
+    v = sub.add_parser("voice")
+    v.add_argument("--port", type=int, default=8000)
+    v.add_argument("--host", default="127.0.0.1")  # ngrok forwards to localhost
     args = p.parse_args(argv)
 
+    if args.cmd == "voice":
+        import uvicorn
+
+        uvicorn.run("voice_server:app", host=args.host, port=args.port)
+        return 0
     if args.cmd == "run":
         print(json.dumps(worker.run(until_idle=args.until_idle, interval=args.interval,
                                     max_cycles=args.max_cycles)))
