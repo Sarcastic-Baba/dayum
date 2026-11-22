@@ -66,6 +66,27 @@ def body_fingerprint(approval: dict) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def draft_step_key(request_id: str, action: str, supplier_id: str) -> str:
+    """Where the engine stores the draft it will send: steps.idem_key =
+    sha256(request_id:draft:action:supplier_id), output_json = {to, subject, body, raw, ...}."""
+    return hashlib.sha256(f"{request_id}:draft:{action}:{supplier_id}".encode()).hexdigest()
+
+
+def with_draft(approval: dict, draft: dict | None) -> dict:
+    """The approval plus the email the approver must see: the row's own email_* columns if the
+    engine filled them, otherwise the engine's stored draft (the message it sends verbatim)."""
+    if (approval.get("email_body") or "").strip() or not draft:
+        return approval
+    return {**approval, "email_to": draft.get("to"), "email_subject": draft.get("subject"),
+            "email_body": draft.get("body")}
+
+
+def _draft_for(db, approval: dict) -> dict | None:
+    key = draft_step_key(approval["request_id"], approval["action"], approval["supplier_id"])
+    rows = db.select("steps", {"idem_key": f"eq.{key}", "status": "eq.done"}, columns="output_json")
+    return (rows[0].get("output_json") or None) if rows else None
+
+
 # ---------------------------------------------------------------- writes
 def create_request(db, data: RequestInput, created_by: str) -> tuple[str, bool]:
     """Insert a RECEIVED request. Returns (request_id, created); created is False when
@@ -97,7 +118,7 @@ def decide_approval(db, approval_id: int, decision: str, approver: str,
     rows = db.select("approvals", {"id": f"eq.{int(approval_id)}"})
     if not rows:
         raise DecisionError("approval not found")
-    approval = rows[0]
+    approval = with_draft(rows[0], _draft_for(db, rows[0]))
     if approval["status"] != "pending":
         raise DecisionError(f"already {approval['status']} by {approval.get('approver')}")
     if decision == "rejected" and not reason:
@@ -164,6 +185,8 @@ def get_request_view(db, request_id: str) -> dict | None:
             "approvals": pool.submit(approvals_and_sent),
             "costs": pool.submit(db.select, "costs", by_req, "*", "at.asc"),
             "logs": pool.submit(db.select, "logs", by_req, "*", "at.desc", 200),
+            "drafts": pool.submit(db.select, "steps", {**by_req, "step": "like.draft:*", "status": "eq.done"},
+                                  "idem_key,output_json"),
         }
         got = {name: job.result() for name, job in jobs.items()}
     if not got["request"]:
@@ -179,8 +202,10 @@ def get_request_view(db, request_id: str) -> dict | None:
                        for c in candidates]
     view_candidates.sort(key=lambda c: (c["rank"] is None, c["rank"] or 0, c["merged_into"] is not None, c["name"]))
 
+    drafts = {s["idem_key"]: s.get("output_json") for s in got["drafts"]}
     actions = []
     for a in approvals:
+        a = with_draft(a, drafts.get(draft_step_key(request_id, a["action"], a["supplier_id"])))
         key = a.get("idem_key") or idem_key(request_id, a["action"], a["supplier_id"])
         status = {"pending": "pending_approval", "rejected": "skipped"}.get(a["status"], "approved")
         if a["status"] == "approved" and key in outbox_keys:

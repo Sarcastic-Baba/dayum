@@ -4,6 +4,7 @@ Understands the PostgREST filters the platform uses (eq., in.()), primary keys,
 identity ids, and the approvals guard trigger from the contract migration."""
 
 import copy
+import fnmatch
 import itertools
 from datetime import datetime, timezone
 
@@ -75,6 +76,8 @@ def _matches(row, filters):
     for col, expr in filters.items():
         op, _, value = expr.partition(".")
         if op == "eq" and str(row.get(col)) != value:
+            return False
+        if op == "like" and not fnmatch.fnmatchcase(str(row.get(col)), value):
             return False
         if op == "in":
             options = [v.strip().strip('"') for v in value.strip("()").split(",")]

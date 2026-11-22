@@ -1,0 +1,47 @@
+# BoxSource engine config — reloaded at the start of every worker cycle.
+# Every rule, threshold and rate lives here so a live change is a config edit, not code.
+
+min_record_date: 2026-09-01
+max_candidates: 10
+search_areas: [Gurgaon, Manesar, Faridabad, Noida, Bawal]
+manufacturer_min_signals: 2
+accept_custom_size_statement: true
+road_factor: 1.3
+transport_inr_per_km_per_load: 0      # fill from client records; shown as an estimate
+boxes_per_load: 0                     # fill from client records
+gst_rate_percent: null                # client-supplied; needed to compare GST-inclusive quotes
+trial_order_fraction: 0.1
+approval_required: [send_rfq, send_po]
+quote_wait_s: 600                     # after this, rank whatever quotes have arrived
+
+limits:
+  cost_inr_per_request: 25
+  time_s_per_request: 400
+
+pricing:                              # INR per unit for the cost ledger — fill with real rates
+  llm_input_per_1k_tokens: 0.0
+  llm_output_per_1k_tokens: 0.0
+  grounded_search_per_call: 0.0
+  crustdata_per_call: 0.0
+  web_search_per_call: 0.0
+
+storage:
+  backend: sqlite                     # sqlite (local runs, tests) | supabase (with the dashboard)
+  sqlite_path: data/boxsource.db
+
+email:
+  transport: file                     # file (local .eml) | smtp (team test inbox, for the demo)
+  outbox_dir: data/outbox
+  inbox_dir: data/inbox
+  from: "BoxSource <boxsource@example.invalid>"
+  test_recipient: "rfq-test@example.invalid"   # team-controlled inbox; never a real supplier
+  sent_folder: '"[Gmail]/Sent Mail"'
+  inbox_folder: INBOX
+  reply_lookback_days: 3
+
+sources:
+  discovery: gemini                   # gemini (grounded search) | crustdata
+  llm: gemini
+
+log_path: data/run.log
+output_fields: [request_id, status, summary, candidates, recommendation, actions, cost_inr, duration_s]

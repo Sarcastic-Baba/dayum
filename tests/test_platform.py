@@ -185,6 +185,49 @@ def test_api_token_cannot_approve(client, db):
     assert next(x for x in db.tables["approvals"] if x["id"] == a["id"])["status"] == "pending"
 
 
+# ---------------------------------------------------------------- engine draft format
+def _engine_style_approval(db):
+    """What engine/actions.py writes: a bare approval row + the draft in a steps row."""
+    rid, sid = fixtures.RFQ_REQ, "sup_02"
+    approval = next(a for a in db.tables["approvals"] if a["request_id"] == rid and a["supplier_id"] == sid)
+    for k in ("email_to", "email_subject", "email_body", "idem_key"):
+        approval.pop(k, None)
+    db.insert("steps", {"request_id": rid, "step": f"draft:send_rfq:{sid}", "status": "done",
+                        "idem_key": repo.draft_step_key(rid, "send_rfq", sid),
+                        "output_json": {"to": "sup_02@test-inbox.invalid", "subject": "ENGINE subject",
+                                        "body": "ENGINE draft body", "raw": "...", "message_id": "<x>"}})
+    return approval
+
+
+def test_engine_draft_in_steps_is_shown_and_approvable(approver, db):
+    approval = _engine_style_approval(db)
+    page = approver.get(f"/requests/{fixtures.RFQ_REQ}")
+    assert "ENGINE draft body" in page.text and "ENGINE subject" in page.text
+    view = approver.get(f"/api/requests/{fixtures.RFQ_REQ}").json()
+    action = next(a for a in view["actions"] if a["id"] == approval["id"])
+    approver.post(f"/approvals/{approval['id']}", data={"request_id": fixtures.RFQ_REQ, "decision": "approve",
+                                                        "fingerprint": action["fingerprint"]})
+    assert next(a for a in db.tables["approvals"] if a["id"] == approval["id"])["status"] == "approved"
+
+
+def test_engine_draft_changed_after_viewing_is_refused(approver, db):
+    approval = _engine_style_approval(db)
+    view = approver.get(f"/api/requests/{fixtures.RFQ_REQ}").json()
+    stale = next(a for a in view["actions"] if a["id"] == approval["id"])["fingerprint"]
+    next(s for s in db.tables["steps"] if s["step"] == "draft:send_rfq:sup_02")["output_json"]["body"] = "changed"
+    approver.post(f"/approvals/{approval['id']}", data={"request_id": fixtures.RFQ_REQ, "decision": "approve",
+                                                        "fingerprint": stale})
+    assert next(a for a in db.tables["approvals"] if a["id"] == approval["id"])["status"] == "pending"
+
+
+def test_no_draft_anywhere_cannot_be_approved(approver, db):
+    approval = _engine_style_approval(db)
+    db.tables["steps"] = [s for s in db.tables["steps"] if not s["step"].startswith("draft:")]
+    approver.post(f"/approvals/{approval['id']}", data={"request_id": fixtures.RFQ_REQ, "decision": "approve",
+                                                        "fingerprint": repo.body_fingerprint(approval)})
+    assert next(a for a in db.tables["approvals"] if a["id"] == approval["id"])["status"] == "pending"
+
+
 # ---------------------------------------------------------------- formatting
 def test_indian_number_grouping():
     from dashboard.ui import indian_number, inr

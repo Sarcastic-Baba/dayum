@@ -1,0 +1,7 @@
+# Engine (worker) dependencies. The root requirements.txt belongs to the platform/Vercel build.
+httpx>=0.27,<1
+python-dotenv>=1,<2
+pydantic>=2,<3
+PyYAML>=6,<7
+google-genai>=1.0,<2
+pytest>=8
