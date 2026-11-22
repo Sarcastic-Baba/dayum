@@ -1,0 +1,36 @@
+{% set rec = r.recommendation %}
+{% if rec %}
+{% set names = {} %}
+{% for c in r.candidates %}{% set _ = names.update({c.supplier_id: c.name}) %}{% endfor %}
+<section class="card p-5" aria-labelledby="rec-title">
+  <h2 id="rec-title" class="font-semibold flex items-center gap-2"><i data-lucide="award" class="h-5 w-5 text-accent-600"></i>Recommendation</h2>
+  <div class="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="rounded-card bg-accent-50 dark:bg-accent-600/15 p-4">
+      <p class="eyebrow !text-accent-700 dark:!text-accent-100">Primary</p>
+      <p class="mt-1 font-semibold">{% if rec.get('primary') %}<button type="button" class="hover:underline text-left" @click='open({{ rec.primary | tojson }})'>{{ names.get(rec.primary, rec.primary) }}</button>{% else %}—{% endif %}</p>
+    </div>
+    <div class="rounded-card bg-slate-50 dark:bg-slate-800/60 p-4">
+      <p class="eyebrow">Backup</p>
+      <p class="mt-1 font-semibold">{% if rec.get('backup') %}<button type="button" class="hover:underline text-left" @click='open({{ rec.backup | tojson }})'>{{ names.get(rec.backup, rec.backup) }}</button>{% else %}—{% endif %}</p>
+    </div>
+    <div class="rounded-card bg-slate-50 dark:bg-slate-800/60 p-4">
+      <p class="eyebrow">Trial order</p>
+      <p class="mt-1 font-semibold tabular-nums">{{ rec.get('trial_order_qty') | num }} boxes</p>
+    </div>
+    <div class="rounded-card bg-slate-50 dark:bg-slate-800/60 p-4">
+      <p class="eyebrow">Full monthly</p>
+      <p class="mt-1 font-semibold tabular-nums">{{ rec.get('full_monthly_qty') | num }} boxes</p>
+    </div>
+  </div>
+  {% if rec.get('reasoning') %}<p class="mt-4 text-sm leading-relaxed">{{ rec.reasoning }}</p>{% endif %}
+  {% if rec.get('caveats') %}
+  <ul class="mt-4 space-y-2">
+    {% for cv in rec.caveats %}
+    <li class="rounded-ctl border-l-4 border-amber-400 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200 text-sm px-3 py-2 flex gap-2">
+      <i data-lucide="triangle-alert" class="h-4 w-4 shrink-0 mt-0.5"></i>{{ cv }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}

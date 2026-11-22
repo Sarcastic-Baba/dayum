@@ -1,0 +1,132 @@
+"""Presentation helpers for templates: formatting and the pipeline stepper. No business logic."""
+
+from datetime import datetime, timedelta, timezone
+
+IST = timezone(timedelta(hours=5, minutes=30))
+
+# Pipeline stepper (PRD §8): label -> the states that count as "at this step".
+STEPPER = [
+    ("Received", ["RECEIVED"]),
+    ("Parsed", ["SPEC_PARSED"]),
+    ("Found", ["CANDIDATES_FOUND"]),
+    ("Checked", ["CANDIDATES_CHECKED"]),
+    ("Shortlisted", ["SHORTLISTED", "RECOMMENDED"]),
+    ("RFQ approval", ["WAIT_APPROVAL_RFQ"]),
+    ("RFQs sent", ["RFQS_SENT"]),
+    ("Awaiting quotes", ["WAIT_QUOTES"]),
+    ("Quotes in", ["QUOTES_RECEIVED"]),
+    ("Ranked", ["RANKED"]),
+    ("PO approval", ["WAIT_APPROVAL_PO"]),
+    ("PO sent", ["PO_SENT"]),
+    ("Done", ["DONE"]),
+]
+
+STATUS_STYLE = {
+    "pending": ("slate", "Pending"),
+    "recommended": ("emerald", "Recommended"),
+    "awaiting_quotes": ("indigo", "Awaiting quotes"),
+    "no_verified_supplier": ("rose", "No verified supplier"),
+    "held": ("amber", "Held"),
+}
+
+RESULT_STYLE = {"pass": "emerald", "fail": "rose", "cannot_verify": "amber"}
+CLASSIFICATION_STYLE = {"manufacturer": "emerald", "trader": "rose", "cannot_verify": "amber"}
+CHECK_LABEL = {
+    "real_active": "Real & active", "manufacturer": "Manufacturer", "duplicate": "Duplicate",
+    "spec_match": "Spec match", "price": "Listed price", "distance": "Distance", "fraud_risk": "Fraud risk",
+}
+
+
+def stepper(state: str) -> list[dict]:
+    """One dict per step: label + 'done' | 'current' | 'todo'. HELD freezes progress where it stopped."""
+    current = next((i for i, (_, states) in enumerate(STEPPER) if state in states), None)
+    steps = []
+    for i, (label, _) in enumerate(STEPPER):
+        if current is None:
+            status = "todo"
+        elif i < current or state == "DONE":
+            status = "done"
+        elif i == current:
+            status = "current"
+        else:
+            status = "todo"
+        steps.append({"label": label, "status": status})
+    return steps
+
+
+def indian_number(value, decimals: int = 0) -> str:
+    """12345678.5 -> '1,23,45,678.50' (Indian digit grouping)."""
+    if value is None or value == "":
+        return "—"
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    sign = "-" if number < 0 else ""
+    whole, _, frac = f"{abs(number):.{decimals}f}".partition(".")
+    if len(whole) > 3:
+        head, tail = whole[:-3], whole[-3:]
+        groups = []
+        while len(head) > 2:
+            groups.insert(0, head[-2:])
+            head = head[:-2]
+        if head:
+            groups.insert(0, head)
+        whole = ",".join(groups + [tail])
+    return sign + whole + (f".{frac}" if frac else "")
+
+
+def inr(value, decimals: int = 2) -> str:
+    text = indian_number(value, decimals)
+    return text if text == "—" else "₹" + text
+
+
+def ist(value) -> str:
+    """ISO timestamp -> '22 Nov, 15:10 IST'."""
+    if not value:
+        return "—"
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return str(value)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(IST).strftime("%d %b, %H:%M IST")
+
+
+def day(value) -> str:
+    """Date or ISO timestamp -> '14 Oct 2026'."""
+    if not value:
+        return "—"
+    try:
+        return datetime.fromisoformat(str(value)[:10]).strftime("%d %b %Y")
+    except ValueError:
+        return str(value)
+
+
+def duration(seconds) -> str:
+    if seconds is None:
+        return "—"
+    seconds = int(float(seconds))
+    return f"{seconds // 60}m {seconds % 60:02d}s" if seconds >= 60 else f"{seconds}s"
+
+
+def size(spec) -> str:
+    dims = (spec or {}).get("size_in")
+    if not dims:
+        return ""
+    return " × ".join(indian_number(d, 0) if float(d).is_integer() else str(d) for d in dims) + " in"
+
+
+def safe_url(value) -> str:
+    """Only http(s) links are rendered as hrefs; scraped data must never inject javascript: URLs."""
+    text = str(value or "").strip()
+    return text if text.lower().startswith(("https://", "http://")) else "#"
+
+
+def install(templates) -> None:
+    env = templates.env
+    env.filters.update(inr=inr, num=indian_number, ist=ist, day=day, duration=duration, size=size,
+                       safe_url=safe_url)
+    env.globals.update(stepper=stepper, STATUS_STYLE=STATUS_STYLE, RESULT_STYLE=RESULT_STYLE,
+                       CLASSIFICATION_STYLE=CLASSIFICATION_STYLE, CHECK_LABEL=CHECK_LABEL)

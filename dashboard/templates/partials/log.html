@@ -1,0 +1,53 @@
+<section class="grid lg:grid-cols-3 gap-6" aria-label="Actions, log and costs">
+  <div class="card p-5 lg:col-span-2">
+    <h2 class="font-semibold flex items-center gap-2"><i data-lucide="scroll-text" class="h-5 w-5 text-accent-600"></i>Action log</h2>
+    {% set decided = r.actions | rejectattr('status', 'equalto', 'pending_approval') | list %}
+    {% if decided %}
+    <ul class="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+      {% for a in decided %}
+      {% set color = {'done': 'emerald', 'approved': 'indigo', 'skipped': 'rose'}.get(a.status, 'slate') %}
+      <li class="py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+        <span class="pill bg-{{ color }}-100 text-{{ color }}-700 dark:bg-{{ color }}-500/15 dark:text-{{ color }}-300">{{ {'done': 'sent', 'approved': 'approved', 'skipped': 'rejected'}.get(a.status, a.status) }}</span>
+        <span class="font-medium">{{ 'RFQ' if a.type == 'send_rfq' else 'PO' }} → {{ a.supplier_name }}</span>
+        <span class="muted">by {{ a.approved_by or '—' }} · {{ a.approved_at | ist }}</span>
+        {% if a.reason %}<span class="w-full text-xs muted">Reason: {{ a.reason }}</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if r.logs %}
+    <div class="mt-3 max-h-80 overflow-y-auto rounded-ctl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800">
+      <table class="w-full text-xs font-mono">
+        <tbody>
+          {% for l in r.logs %}
+          <tr class="align-top">
+            <td class="px-3 py-1.5 muted whitespace-nowrap tabular-nums">{{ l.at | ist }}</td>
+            <td class="px-2 py-1.5 whitespace-nowrap {{ 'text-rose-600' if l.level in ('error', 'ERROR') else ('text-amber-600' if l.level in ('warning', 'WARNING') else 'muted') }}">{{ l.level }}</td>
+            <td class="px-3 py-1.5 break-all">{{ l.message }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% elif not decided %}
+    <p class="mt-3 muted text-sm">Nothing logged yet.</p>
+    {% endif %}
+  </div>
+
+  <div class="card p-5">
+    <h2 class="font-semibold flex items-center gap-2"><i data-lucide="receipt-indian-rupee" class="h-5 w-5 text-accent-600"></i>Cost ledger</h2>
+    {% if r.cost_by_type %}
+    <table class="mt-3 w-full text-sm">
+      <thead><tr class="eyebrow text-left"><th scope="col" class="py-1.5">Call type</th><th scope="col" class="py-1.5 text-right">Calls</th><th scope="col" class="py-1.5 text-right">₹</th></tr></thead>
+      <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+        {% for row in r.cost_by_type %}
+        <tr><td class="py-1.5">{{ row.call_type }}</td><td class="py-1.5 text-right tabular-nums">{{ row.calls }}</td><td class="py-1.5 text-right tabular-nums">{{ row.inr | inr }}</td></tr>
+        {% endfor %}
+      </tbody>
+      <tfoot><tr class="font-semibold"><td class="pt-2">Total</td><td></td><td class="pt-2 text-right tabular-nums">{{ r.cost_inr | inr }}</td></tr></tfoot>
+    </table>
+    {% else %}
+    <p class="mt-3 muted text-sm">No billable calls recorded yet.</p>
+    {% endif %}
+  </div>
+</section>

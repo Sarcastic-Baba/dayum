@@ -6,31 +6,65 @@ prepare an order recommendation. See `PRD-sourcing.md` for the planned workflow.
 
 ## Current status
 
-Deployment foundation only: FastAPI health endpoints and an initial Supabase
-Postgres migration. Discovery, sourcing, authentication, approvals and execution
-are not implemented yet. No real supplier emails are sent.
+**Platform (dashboard + API):** login, request intake (structured or free text),
+the live request view (pipeline stepper, candidates, evidence drawer,
+recommendation, quote timeline, action log, cost ledger) and the approval gate
+for RFQs and the PO are built and tested against fake fixture data. The schema
+contract is in `supabase/migrations/`.
+**Engine (worker):** built separately (see `ujjwal/CLAUDE.md`). The dashboard
+never computes a verdict and never sends email; it renders what the engine
+writes to Supabase and records human decisions. No real supplier emails are sent.
 
 ## Local setup
 
-Use Python 3.12:
+Use Python 3.12 (3.13 also works locally):
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\python -m pip install -r requirements.txt
+.\.venv\Scripts\python -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env
 .\.venv\Scripts\python -m uvicorn app:app --reload
 ```
 
-Fill `.env` with your Supabase project URL, backend secret key and a randomly
-generated `HEALTHCHECK_TOKEN`. Never commit credentials.
+Fill `.env` with your Supabase project URL, backend secret key, a randomly
+generated `HEALTHCHECK_TOKEN` and `SESSION_SECRET`, and the demo accounts.
+Never commit credentials.
+
+## Demo login
+
+The dashboard is behind a login with two accounts, both defined only in
+environment variables (`.env` locally, Vercel project settings when deployed) —
+never in the code or the repo:
+
+| Account | Variables | Can |
+|---|---|---|
+| Approver | `DEMO_APPROVER_EMAIL`, `DEMO_APPROVER_PASSWORD` | submit requests, approve or reject RFQs and the PO |
+| Viewer | `DEMO_VIEWER_EMAIL`, `DEMO_VIEWER_PASSWORD` | read everything, change nothing (for judges) |
+
+The logged-in email is written to `approvals.approver` with the decision time.
+Rejecting needs a typed reason. Approving is refused if the email text changed
+after the approver viewed it. `API_TOKEN` lets scripts create and read requests
+but can never approve.
+
+## Preview the UI and run tests (no Supabase needed)
+
+```powershell
+.\.venv\Scripts\python -m pytest -q
+.\.venv\Scripts\python -m tests.preview_server   # http://127.0.0.1:8000
+```
+
+The preview uses clearly fake fixture rows from `tests/fixtures.py` (log in as
+`approver@preview.local` / `preview-approver` or `viewer@preview.local` /
+`preview-viewer`; these exist only in the preview script). Fixture data is never
+loaded into the live project.
 
 `GET /api/health` checks the application. `GET /api/ready` checks database access
 and the requests table; it requires `Authorization: Bearer <HEALTHCHECK_TOKEN>`.
 
 ## Supabase
 
-Create or choose a dedicated project, then apply
-`supabase/migrations/20261122000100_boxsource.sql` in its SQL Editor.
+Create or choose a dedicated project, then apply both migrations in order in its
+SQL Editor: `20261122000100_boxsource.sql`, then `20261122000200_contract_v1.sql`.
 Alternatively, with the Supabase CLI:
 
 ```powershell
@@ -41,8 +75,7 @@ npx supabase db push
 ```
 
 The migration enables RLS and denies browser roles access to all application
-tables. Only the backend uses the secret key. User authentication and authorization
-must be implemented before adding data or approval endpoints.
+tables. Only the backend uses the secret key; the browser never sees it.
 
 ## Vercel
 
@@ -55,6 +88,11 @@ vercel link
 vercel env add SUPABASE_URL
 vercel env add SUPABASE_SECRET_KEY
 vercel env add HEALTHCHECK_TOKEN
+vercel env add SESSION_SECRET
+vercel env add DEMO_APPROVER_EMAIL
+vercel env add DEMO_APPROVER_PASSWORD
+vercel env add DEMO_VIEWER_EMAIL
+vercel env add DEMO_VIEWER_PASSWORD
 vercel deploy
 ```
 

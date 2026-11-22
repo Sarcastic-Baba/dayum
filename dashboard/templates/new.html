@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}New request{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto" x-data="{ mode: '{{ 'text' if values.get('free_text') else 'form' }}' }">
+  <a href="/" class="btn-ghost -ml-3 mb-2"><i data-lucide="arrow-left" class="h-4 w-4"></i>Requests</a>
+  <h1 class="text-2xl font-semibold tracking-tight">New sourcing request</h1>
+  <p class="muted text-sm mt-1">Fields you leave blank are listed as assumptions for confirmation — nothing is guessed.</p>
+
+  {% if errors %}
+  <div role="alert" class="mt-5 rounded-card border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/40 p-4 text-sm text-rose-800 dark:text-rose-200">
+    <p class="font-medium flex items-center gap-2"><i data-lucide="circle-alert" class="h-4 w-4"></i>Please fix the following</p>
+    <ul class="list-disc ml-6 mt-2 space-y-0.5">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+
+  <div class="mt-6 inline-flex rounded-ctl bg-slate-100 dark:bg-slate-800 p-1" role="tablist" aria-label="Request format">
+    <button type="button" role="tab" :aria-selected="mode === 'form'" @click="mode = 'form'"
+            :class="mode === 'form' ? 'bg-white dark:bg-slate-900 shadow-sm' : 'muted'" class="btn !py-1.5">
+      <i data-lucide="list" class="h-4 w-4"></i>Structured</button>
+    <button type="button" role="tab" :aria-selected="mode === 'text'" @click="mode = 'text'"
+            :class="mode === 'text' ? 'bg-white dark:bg-slate-900 shadow-sm' : 'muted'" class="btn !py-1.5">
+      <i data-lucide="message-square-text" class="h-4 w-4"></i>Free text</button>
+  </div>
+
+  <form method="post" action="/requests" class="card p-6 mt-4 space-y-6">
+    <input type="hidden" name="request_id" value="{{ request_id }}">
+
+    <div x-show="mode === 'text'" x-cloak>
+      <label for="free_text" class="label">Describe what you need</label>
+      <textarea id="free_text" name="free_text" rows="5" class="input" :disabled="mode !== 'text'"
+        placeholder="We need 50,000 corrugated boxes (5-ply, 18×12×12 in) a month for our Gurgaon warehouse by 15 Dec.">{{ values.get('free_text', '') }}</textarea>
+      <p class="muted text-xs mt-2">The engine extracts the spec from this text and lists anything it could not fill as an assumption.</p>
+    </div>
+
+    <div x-show="mode === 'form'" class="space-y-6">
+      <fieldset class="grid sm:grid-cols-2 gap-4" :disabled="mode !== 'form'">
+        <legend class="eyebrow mb-3 sm:col-span-2">Item</legend>
+        <div class="sm:col-span-2">
+          <label for="item" class="label">Item</label>
+          <input id="item" name="item" class="input" placeholder="corrugated box" value="{{ values.get('item', '') }}">
+        </div>
+        <div>
+          <label for="ply" class="label">Ply</label>
+          <input id="ply" name="ply" type="number" min="1" max="9" step="1" inputmode="numeric" class="input tabular-nums" placeholder="5" value="{{ values.get('ply', '') }}">
+        </div>
+        <div>
+          <span class="label" id="size-label">Size (L × W × H, inches)</span>
+          <div class="grid grid-cols-3 gap-2" role="group" aria-labelledby="size-label">
+            <input name="size_l" type="number" min="0" step="any" class="input tabular-nums" placeholder="18" aria-label="Length" value="{{ values.get('size_l', '') }}">
+            <input name="size_w" type="number" min="0" step="any" class="input tabular-nums" placeholder="12" aria-label="Width" value="{{ values.get('size_w', '') }}">
+            <input name="size_h" type="number" min="0" step="any" class="input tabular-nums" placeholder="12" aria-label="Height" value="{{ values.get('size_h', '') }}">
+          </div>
+        </div>
+        <div>
+          <label for="material" class="label">Material</label>
+          <input id="material" name="material" class="input" placeholder="kraft" value="{{ values.get('material', '') }}">
+        </div>
+        <div>
+          <label for="printing" class="label">Printing</label>
+          <input id="printing" name="printing" class="input" placeholder="none" value="{{ values.get('printing', '') }}">
+        </div>
+      </fieldset>
+
+      <fieldset class="grid sm:grid-cols-2 gap-4" :disabled="mode !== 'form'">
+        <legend class="eyebrow mb-3 sm:col-span-2">Volume &amp; delivery</legend>
+        <div>
+          <label for="quantity_per_month" class="label">Quantity per month</label>
+          <input id="quantity_per_month" name="quantity_per_month" type="number" min="1" step="1" inputmode="numeric" class="input tabular-nums" placeholder="50000" value="{{ values.get('quantity_per_month', '') }}">
+        </div>
+        <div>
+          <label for="delivery_location" class="label">Delivery location</label>
+          <input id="delivery_location" name="delivery_location" class="input" placeholder="Gurgaon, Haryana" value="{{ values.get('delivery_location', '') }}">
+        </div>
+        <div>
+          <label for="needed_by" class="label">Needed by</label>
+          <input id="needed_by" name="needed_by" type="date" class="input tabular-nums" value="{{ values.get('needed_by', '') }}">
+        </div>
+        <div>
+          <label for="budget_inr_per_unit" class="label">Budget per box (₹, optional)</label>
+          <input id="budget_inr_per_unit" name="budget_inr_per_unit" type="number" min="0" step="0.01" class="input tabular-nums" placeholder="—" value="{{ values.get('budget_inr_per_unit', '') }}">
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
+      <a href="/" class="btn-ghost">Cancel</a>
+      <button class="btn-primary"><i data-lucide="play" class="h-4 w-4"></i>Start sourcing</button>
+    </div>
+  </form>
+</div>
+<style>[x-cloak]{display:none!important}</style>
+{% endblock %}

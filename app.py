@@ -1,4 +1,5 @@
-"""BoxSource deployment foundation; sourcing workflow is not implemented yet."""
+"""BoxSource platform: dashboard + API on Vercel. The sourcing engine is a separate worker;
+the two talk only through Supabase (PRD §4)."""
 
 import hmac
 import os
@@ -7,13 +8,12 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, Header, HTTPException
 
+from dashboard import db, routes
+
 load_dotenv()
-app = FastAPI(title="BoxSource", version="0.1.0", docs_url=None, redoc_url=None)
-
-
-@app.get("/")
-def index():
-    return {"service": "BoxSource", "status": "setup", "health": "/api/health"}
+app = FastAPI(title="BoxSource", version="0.2.0", docs_url=None, redoc_url=None)
+app.state.db_factory = db.from_env
+routes.install(app)
 
 
 @app.get("/api/health")
