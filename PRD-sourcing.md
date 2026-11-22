@@ -352,6 +352,8 @@ Shared **M0 — freeze the contract** (both agents, first): agree the Supabase s
 - `/` — requests: id, item, location, status, cost.
 - `/requests/{id}` — parsed spec + assumptions; candidate table (rank, name, classification badge, listed vs **quoted** price, distance, est. landed cost); each candidate expands to its checks (green/red/grey) with evidence (fact, quote, link, date); recommendation box with caveats; pending approvals — RFQ list with tick boxes per supplier and email preview, PO preview; Approve / Reject (reject needs a typed reason); cost + time used; action log.
 - `POST /requests`, `POST /approvals/{id}`.
+- Behind a login with two seeded demo accounts (approver + read-only viewer); the logged-in user is recorded as `approvals.approver`.
+- Visual design spec (stack, tokens, screens, live pipeline stepper, evidence drawer, quality bar) and the demo-login spec: [`chaitanya/AGENTS.md`](chaitanya/AGENTS.md) → *Design* and *Demo login*.
 
 ## 18. Logging
 - One structured line per step: request_id, step, supplier_id, status, duration_ms, cost_inr → `logs` table (and a local `run.log` for the worker).
