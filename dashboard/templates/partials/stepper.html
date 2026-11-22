@@ -1,41 +1,48 @@
 {% set steps = stepper(r.state) %}
 {% set ns = namespace(current=None, index=0) %}
 {% for s in steps %}{% if s.status == 'current' %}{% set ns.current = s.label %}{% set ns.index = loop.index %}{% endif %}{% endfor %}
+{% set held = r.state == 'HELD' %}
+{% set live = poll and r.state not in HUMAN_WAIT %}
 <section class="card p-4 sm:p-5" aria-label="Pipeline progress">
-  {% if r.state == 'HELD' %}
-  <p class="mb-3 flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-300">
-    <i data-lucide="octagon-pause" class="h-4 w-4"></i>Run held{% if r.status_reason %} — {{ r.status_reason }}{% endif %}
-  </p>
-  {% endif %}
-
-  {# Phone: one line + progress bar. #}
-  <div class="md:hidden">
-    <div class="flex justify-between text-sm">
-      <span class="font-medium">{{ ns.current or ('Held' if r.state == 'HELD' else r.state) }}</span>
-      <span class="muted tabular-nums">{% if ns.index %}Step {{ ns.index }} of {{ steps | length }}{% endif %}</span>
+  {# Below lg: one line + progress bar. #}
+  <div class="lg:hidden">
+    <div class="flex items-center justify-between gap-3 text-sm">
+      <span class="font-medium flex items-center gap-2">
+        {% if held %}<span class="h-2 w-2 rounded-full bg-rose-500"></span>On hold
+        {% else %}<span class="h-2 w-2 rounded-full bg-accent-600 {{ 'animate-pulse' if live }}"></span>{{ ns.current or STATE_LABELS.get(r.state, r.state) }}{% endif %}
+      </span>
+      {% if ns.index %}<span class="muted tabular-nums">Step {{ ns.index }} of {{ steps | length }}</span>{% endif %}
     </div>
-    <div class="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
-      <div class="h-1.5 rounded-full bg-accent-600 transition-all" style="width: {{ ((ns.index or (steps | length if r.state == 'DONE' else 0)) / (steps | length) * 100) | round }}%"></div>
+    <div class="mt-2.5 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800">
+      <div class="h-1.5 rounded-full {{ 'bg-rose-500' if held else 'bg-accent-600' }} transition-all duration-500"
+           style="width: {{ (100 if held or r.state == 'DONE' else (ns.index / (steps | length) * 100)) | round | int }}%"></div>
     </div>
   </div>
 
-  {# Desktop: full stepper. #}
-  <ol class="hidden md:flex items-start">
+  {# lg and up: the full stepper. #}
+  <ol class="hidden lg:flex items-start">
     {% for s in steps %}
-    <li class="flex-1 flex flex-col items-center text-center relative" {% if s.status == 'current' %}aria-current="step"{% endif %}>
+    <li class="flex-1 min-w-0 flex flex-col items-center text-center relative" {% if s.status == 'current' %}aria-current="step"{% endif %}>
       {% if not loop.first %}
       <span class="absolute top-3 right-1/2 w-full h-0.5 {{ 'bg-accent-600' if s.status in ('done', 'current') else 'bg-slate-200 dark:bg-slate-800' }}" aria-hidden="true"></span>
       {% endif %}
-      <span class="relative z-10 grid place-items-center h-6 w-6 rounded-full text-xs font-semibold
+      <span class="relative z-10 grid place-items-center h-6 w-6 rounded-full text-[11px] font-semibold transition
         {% if s.status == 'done' %}bg-accent-600 text-white
         {% elif s.status == 'current' %}bg-white dark:bg-slate-900 ring-2 ring-accent-600 text-accent-600
-        {% else %}bg-slate-100 dark:bg-slate-800 text-slate-400{% endif %}">
+        {% else %}bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400{% endif %}">
         {% if s.status == 'done' %}<i data-lucide="check" class="h-3.5 w-3.5"></i>
-        {% elif s.status == 'current' %}<span class="h-2 w-2 rounded-full bg-accent-600 {{ 'animate-ping' if poll }}"></span>
+        {% elif s.status == 'current' %}<span class="h-2 w-2 rounded-full bg-accent-600 {{ 'animate-pulse' if live }}"></span>
         {% else %}{{ loop.index }}{% endif %}
       </span>
-      <span class="mt-2 text-[11px] leading-tight px-0.5 {{ 'font-semibold text-slate-900 dark:text-white' if s.status == 'current' else 'muted' }}">{{ s.label }}</span>
+      <span class="mt-2 text-[11px] leading-tight px-1 {{ 'font-semibold text-slate-900 dark:text-white' if s.status == 'current' else 'muted' }}">{{ s.label }}</span>
     </li>
     {% endfor %}
+    {% if held %}
+    <li class="flex-1 min-w-0 flex flex-col items-center text-center relative" aria-current="step">
+      <span class="absolute top-3 right-1/2 w-full h-0.5 bg-rose-300 dark:bg-rose-900" aria-hidden="true"></span>
+      <span class="relative z-10 grid place-items-center h-6 w-6 rounded-full bg-rose-600 text-white"><i data-lucide="octagon-pause" class="h-3.5 w-3.5"></i></span>
+      <span class="mt-2 text-[11px] leading-tight font-semibold text-rose-700 dark:text-rose-300">On hold</span>
+    </li>
+    {% endif %}
   </ol>
 </section>

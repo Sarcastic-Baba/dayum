@@ -20,9 +20,10 @@ from tests import fixtures  # noqa: E402
 from tests.fakedb import FakeDb  # noqa: E402
 
 db = FakeDb(fixtures.tables())
-# A request still running (no approvals yet), to show the live stepper and polling.
-running = fixtures._request("FIXTURE-RUNNING", "CANDIDATES_CHECKED", "pending",
-                            {"limits": {"cost_inr_per_request": 25, "time_s_per_request": 400}, "duration_s": 41})
+# A request still running (checks under way), to show the live stepper and polling.
+running = fixtures._request("FIXTURE-RUNNING", "CANDIDATES_CHECKED", "pending", fixtures._result(
+    "FIXTURE-RUNNING", "CANDIDATES_CHECKED", "pending", duration_s=41,
+    summary="FAKE: 4 candidate suppliers found; background checks in progress."))
 db.insert("requests", running)
 for row in fixtures._candidates("FIXTURE-RUNNING")[:2]:
     db.insert("candidates", row)

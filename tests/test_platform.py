@@ -54,21 +54,24 @@ def test_create_request_from_form_is_idempotent(approver, db):
     assert row["input_json"]["needed_by"] is None  # blank stays null for the engine to list as an assumption
 
 
-def test_create_request_free_text(approver, db):
-    approver.post("/requests", data={"request_id": "SRC-TEXT-1", "free_text": "50k 5-ply boxes for Gurgaon"})
-    row = next(r for r in db.tables["requests"] if r["request_id"] == "SRC-TEXT-1")
-    assert row["input_json"]["free_text"] == "50k 5-ply boxes for Gurgaon"
+def test_new_form_issues_web_id(approver):
+    page = approver.get("/requests/new")
+    import re
+    assert re.search(r'name="request_id" value="WEB-[A-Z2-9]{6}"', page.text)
+    assert "free_text" not in page.text  # structured fields only: the engine does not parse free text
 
 
 def test_create_request_validation_message(approver, db):
-    response = approver.post("/requests", data={"request_id": "SRC-BAD-1", "item": "box"})
-    assert response.status_code == 200 and "item, quantity per month and delivery location" in response.text
-    assert not any(r["request_id"] == "SRC-BAD-1" for r in db.tables["requests"])
+    response = approver.post("/requests", data={"request_id": "WEB-BAD111", "item": "box", "ply": "5"})
+    assert response.status_code == 200
+    for field in ("Size: is required", "Quantity per month: is required", "Delivery location: is required"):
+        assert field in response.text
+    assert not any(r["request_id"] == "WEB-BAD111" for r in db.tables["requests"])
 
 
 def test_create_request_json_with_api_token(client, db):
     body = {"request_id": "SRC-API-1", "item": "corrugated box", "quantity_per_month": 1000,
-            "delivery_location": "Noida", "spec": {"ply": 3}}
+            "delivery_location": "Noida", "spec": {"ply": 3, "size_in": [10, 8, 6]}}
     response = client.post("/requests", json=body, headers={"Authorization": "Bearer test-api-token"})
     assert response.status_code == 201 and response.json() == {"request_id": "SRC-API-1", "created": True}
     again = client.post("/requests", json=body, headers={"Authorization": "Bearer test-api-token"})
@@ -77,7 +80,7 @@ def test_create_request_json_with_api_token(client, db):
 
 def test_viewer_cannot_create_request(viewer, db):
     before = len(db.tables["requests"])
-    response = viewer.post("/requests", data={"free_text": "anything"})
+    response = viewer.post("/requests", data={"item": "box"})
     assert response.status_code == 403
     assert len(db.tables["requests"]) == before
 
@@ -102,13 +105,60 @@ def test_detail_page_renders_for_viewer(viewer):
     assert page.status_code == 200
     assert "Fixture Corrugators Pvt Ltd (FAKE)" in page.text
     assert "Read-only account" in page.text
-    assert "Approve &amp; send" not in page.text
+    assert "Approve selected" not in page.text
+    assert "Waiting for the approver" in page.text
 
 
 def test_detail_page_renders_approval_form_for_approver(approver):
     page = approver.get(f"/requests/{fixtures.RFQ_REQ}")
-    assert "Approve &amp; send" in page.text and "FAKE request for quotation body" in page.text
-    assert 'hx-trigger' not in page.text  # waiting on a human: no polling under the form
+    assert "Approve selected" in page.text and "FAKE request for quotation body" in page.text
+    assert "Waiting for your approval" in page.text
+    assert "Shortlist — before quotes" in page.text and "Not eligible" in page.text
+    assert 'hx-trigger="every 3s' in page.text  # keeps polling until DONE/HELD
+
+
+def test_poll_never_replaces_an_unchanged_approval_form(approver, db):
+    page = approver.get(f"/requests/{fixtures.RFQ_REQ}")
+    import re
+    version = re.search(r"/live\?v=([0-9a-f]+)", page.text).group(1)
+    same = approver.get(f"/requests/{fixtures.RFQ_REQ}/live?v={version}")
+    assert 'id="live-top" hx-swap-oob="true"' in same.text and 'id="approvals"' not in same.text
+    a = pending(db, fixtures.RFQ_REQ)[0]
+    approver.post(f"/approvals/{a['id']}", data={"request_id": fixtures.RFQ_REQ, "decision": "reject", "reason": "x"})
+    changed = approver.get(f"/requests/{fixtures.RFQ_REQ}/live?v={version}")
+    assert 'id="approvals" hx-swap-oob="true"' in changed.text
+
+
+def test_held_shows_reason_and_not_eligible(viewer):
+    page = viewer.get(f"/requests/{fixtures.HELD_REQ}")
+    assert "No supplier could be verified — by design, none is recommended" in page.text
+    assert "no supplier passed every eligibility check" in page.text
+    assert "calls itself a trader" in page.text
+    assert 'hx-trigger' not in page.text  # HELD is terminal: polling stops
+
+
+def test_voice_request_queued_with_phone_badge(viewer):
+    listing = viewer.get("/")
+    assert fixtures.VOICE_REQ in listing.text and "Phone" in listing.text
+    page = viewer.get(f"/requests/{fixtures.VOICE_REQ}")
+    assert "Queued — waiting for the sourcing agent to pick this up" in page.text
+    assert "Caller said" in page.text
+
+
+def test_logs_are_parsed_from_engine_json(viewer):
+    page = viewer.get(f"/requests/{fixtures.RFQ_REQ}")
+    assert "check:manufacturer" in page.text and "2,100" in page.text
+
+
+def test_trigger_refusal_becomes_friendly_message(approver, db):
+    from dashboard.db import Rejected
+    a = pending(db, fixtures.RFQ_REQ)[0]
+    def refuse(*args, **kwargs):
+        raise Rejected("approval 5 already decided (approved)")
+    db.update = refuse
+    response = approver.post(f"/approvals/{a['id']}", data={"request_id": fixtures.RFQ_REQ, "decision": "reject",
+                                                            "reason": "x"}, follow_redirects=False)
+    assert response.status_code == 303 and "decisions%20are%20final" in response.headers["location"]
 
 
 def test_po_page_renders(approver):

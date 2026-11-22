@@ -1,56 +1,54 @@
-{% set spec = (r.spec or {}).get('spec') or r.input.get('spec') or {} %}
-{% set item = (r.spec or {}).get('item') or r.input.get('item') %}
+{% set inp = r.input %}
 {% set color, label = STATUS_STYLE.get(r.status, ('slate', r.status)) %}
 <section class="flex flex-col lg:flex-row lg:items-start gap-4 lg:gap-6" aria-labelledby="req-title">
   <div class="min-w-0 flex-1">
     <div class="flex flex-wrap items-center gap-2">
-      <span class="muted text-sm tabular-nums">{{ r.request_id }}</span>
-      <span class="pill bg-{{ color }}-100 text-{{ color }}-700 dark:bg-{{ color }}-500/15 dark:text-{{ color }}-300">
-        {% if poll %}<span class="h-1.5 w-1.5 rounded-full bg-current animate-pulse"></span>{% endif %}{{ label }}
-      </span>
+      <span class="muted text-sm font-medium tabular-nums">{{ r.request_id }}</span>
+      <span class="pill bg-{{ color }}-100 text-{{ color }}-700 dark:bg-{{ color }}-500/15 dark:text-{{ color }}-300">{{ label }}</span>
+      {% if r.is_voice %}<span class="pill bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"><i data-lucide="phone" class="h-3 w-3"></i>Phone</span>{% endif %}
     </div>
-    <h1 id="req-title" class="mt-1 text-2xl font-semibold tracking-tight">
-      {% if item %}{{ item | capitalize }}{% else %}Free-text request{% endif %}
-      {% if spec.get('ply') %}<span class="muted font-normal"> · {{ spec.ply }}-ply</span>{% endif %}
-      {% if spec.get('size_in') %}<span class="muted font-normal tabular-nums"> · {{ spec | size }}</span>{% endif %}
+    <h1 id="req-title" class="mt-1.5 text-2xl sm:text-3xl font-semibold tracking-tight">
+      {{ (inp.get('item') or 'Sourcing request') | capitalize }}{% if r.spec_summary %}<span class="muted font-normal"> · {{ r.spec_summary }}</span>{% endif %}
     </h1>
-    <p class="muted text-sm mt-1 flex flex-wrap gap-x-4 gap-y-1">
-      {% set qty = (r.spec or {}).get('quantity_per_month') or r.input.get('quantity_per_month') %}
-      {% set loc = (r.spec or {}).get('delivery_location') or r.input.get('delivery_location') %}
-      {% set by = (r.spec or {}).get('needed_by') or r.input.get('needed_by') %}
-      {% if qty %}<span class="inline-flex items-center gap-1.5"><i data-lucide="boxes" class="h-4 w-4"></i><span class="tabular-nums">{{ qty | num }}</span>/month</span>{% endif %}
-      {% if loc %}<span class="inline-flex items-center gap-1.5"><i data-lucide="map-pin" class="h-4 w-4"></i>{{ loc }}</span>{% endif %}
-      {% if by %}<span class="inline-flex items-center gap-1.5"><i data-lucide="calendar" class="h-4 w-4"></i>by {{ by | day }}</span>{% endif %}
-      {% if r.created_by %}<span class="inline-flex items-center gap-1.5"><i data-lucide="user" class="h-4 w-4"></i>{{ r.created_by }}</span>{% endif %}
-    </p>
-    {% if r.input.get('free_text') %}
-    <blockquote class="mt-3 border-l-2 border-accent-500 pl-3 text-sm italic text-slate-600 dark:text-slate-300">“{{ r.input.free_text }}”</blockquote>
+    <dl class="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm muted">
+      {% if inp.get('quantity_per_month') %}<div class="inline-flex items-center gap-1.5"><dt class="sr-only">Quantity</dt><i data-lucide="boxes" class="h-4 w-4"></i><dd><span class="tabular-nums text-slate-700 dark:text-slate-200">{{ inp.quantity_per_month | num }}</span> / month</dd></div>{% endif %}
+      {% if inp.get('delivery_location') %}<div class="inline-flex items-center gap-1.5"><dt class="sr-only">Delivery location</dt><i data-lucide="map-pin" class="h-4 w-4"></i><dd>{{ inp.delivery_location }}</dd></div>{% endif %}
+      {% if inp.get('needed_by') %}<div class="inline-flex items-center gap-1.5"><dt class="sr-only">Needed by</dt><i data-lucide="calendar" class="h-4 w-4"></i><dd>by {{ inp.needed_by | day }}</dd></div>{% endif %}
+      {% set mat = (inp.get('spec') or {}).get('material') %}
+      {% if mat %}<div class="inline-flex items-center gap-1.5"><dt class="sr-only">Material</dt><i data-lucide="layers" class="h-4 w-4"></i><dd>{{ mat }}</dd></div>{% endif %}
+      {% if inp.get('budget_inr_per_unit') %}<div class="inline-flex items-center gap-1.5"><dt class="sr-only">Budget</dt><i data-lucide="wallet" class="h-4 w-4"></i><dd>budget {{ inp.budget_inr_per_unit | inr }}/box</dd></div>{% endif %}
+      {% if r.created_by %}<div class="inline-flex items-center gap-1.5"><dt class="sr-only">Created by</dt><i data-lucide="user" class="h-4 w-4"></i><dd>{{ r.created_by }} · {{ r.created_at | ist }}</dd></div>{% endif %}
+    </dl>
+    {% if r.is_voice and r.caller_words %}
+    <blockquote class="mt-3 max-w-2xl border-l-2 border-violet-400 pl-3 text-sm italic text-slate-600 dark:text-slate-300">
+      <span class="not-italic eyebrow block mb-0.5">Caller said</span>“{{ r.caller_words }}”
+    </blockquote>
     {% endif %}
   </div>
 
+  {% set cost_limit = r.limits.get('cost_inr_per_request') %}
+  {% set time_limit = r.limits.get('time_s_per_request') %}
   <div class="grid grid-cols-2 gap-3 lg:w-80 shrink-0">
-    {% set cost_limit = r.limits.get('cost_inr_per_request') %}
-    {% set time_limit = r.limits.get('time_s_per_request') %}
-    <div class="card p-3">
-      <div class="eyebrow flex items-center gap-1.5"><i data-lucide="indian-rupee" class="h-3.5 w-3.5"></i>Cost</div>
-      <div class="mt-1 text-lg font-semibold tabular-nums">{{ r.cost_inr | inr }}</div>
+    <div class="card p-3.5">
+      <div class="eyebrow flex items-center gap-1.5"><i data-lucide="indian-rupee" class="h-3.5 w-3.5"></i>Cost so far</div>
+      <div class="mt-1 text-xl font-semibold tabular-nums">{{ r.cost_inr | inr }}</div>
       {% if cost_limit %}
-      {% set pct = [100, (r.cost_inr / cost_limit * 100) | round] | min %}
-      <div class="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Cost used of limit" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+      {% set pct = [100, (r.cost_inr / cost_limit * 100) | round | int] | min %}
+      <div class="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Cost used of the per-request limit" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
         <div class="h-1.5 rounded-full {{ 'bg-rose-500' if pct >= 90 else 'bg-accent-600' }}" style="width: {{ pct }}%"></div>
       </div>
-      <div class="muted text-xs mt-1 tabular-nums">of {{ cost_limit | inr }} limit</div>
+      <div class="muted text-xs mt-1 tabular-nums">limit {{ cost_limit | inr(0) }}</div>
       {% endif %}
     </div>
-    <div class="card p-3">
-      <div class="eyebrow flex items-center gap-1.5"><i data-lucide="timer" class="h-3.5 w-3.5"></i>Run time</div>
-      <div class="mt-1 text-lg font-semibold tabular-nums">{{ r.duration_s | duration }}</div>
-      {% if time_limit and r.duration_s is not none %}
-      {% set pct = [100, (r.duration_s / time_limit * 100) | round] | min %}
-      <div class="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Run time used of limit" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
+    <div class="card p-3.5">
+      <div class="eyebrow flex items-center gap-1.5"><i data-lucide="timer" class="h-3.5 w-3.5"></i>Active time</div>
+      <div class="mt-1 text-xl font-semibold tabular-nums">{{ r.duration_s | duration }}</div>
+      {% if time_limit %}
+      {% set pct = [100, ((r.duration_s or 0) / time_limit * 100) | round | int] | min %}
+      <div class="mt-2 h-1.5 rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-label="Processing time used of the per-request limit" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100">
         <div class="h-1.5 rounded-full {{ 'bg-rose-500' if pct >= 90 else 'bg-accent-600' }}" style="width: {{ pct }}%"></div>
       </div>
-      <div class="muted text-xs mt-1 tabular-nums">of {{ time_limit | duration }} limit</div>
+      <div class="muted text-xs mt-1 tabular-nums">limit {{ time_limit | duration }}</div>
       {% endif %}
     </div>
   </div>

@@ -16,11 +16,13 @@
     </div>
 
     <div class="px-5 py-5 space-y-4">
-      {% if c.unparsed_replies %}
-      <p class="rounded-ctl bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 text-sm p-3 flex gap-2">
-        <i data-lucide="mail-warning" class="h-4 w-4 shrink-0 mt-0.5"></i>{{ c.unparsed_replies }} reply could not be parsed and needs a human look — it was not guessed.
-      </p>
-      {% endif %}
+      {% for q in c.unparsed_replies %}
+      <div class="rounded-ctl bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-100 text-sm p-3 flex flex-wrap items-center gap-2">
+        <i data-lucide="mail-warning" class="h-4 w-4 shrink-0"></i>
+        <span class="flex-1 min-w-0">Reply received {{ q.received_at | ist }}, but no price could be read — it needs a person. Nothing was guessed.</span>
+        {% if q.raw_eml %}<button type="button" class="btn-outline !py-1 !px-2 text-xs" @click='showMail({{ q.raw_eml | tojson }})'><i data-lucide="mail-open" class="h-3.5 w-3.5"></i>View email</button>{% endif %}
+      </div>
+      {% endfor %}
 
       {% for k in c.checks %}
       {% set color = RESULT_STYLE.get(k.result, 'slate') %}
@@ -65,7 +67,10 @@
           <div><dt class="muted text-xs">Lead time</dt><dd class="tabular-nums">{% if c.quoted_lead_time_days is not none %}{{ c.quoted_lead_time_days }} days{% else %}—{% endif %}</dd></div>
         </dl>
         {% if c.quote_source %}<blockquote class="mt-2 border-l-2 border-accent-500 pl-3 text-sm break-words">{{ c.quote_source }}</blockquote>{% endif %}
-        <p class="mt-1 text-xs muted tabular-nums">Received {{ c.quote_received_at | ist }}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+          <p class="text-xs muted tabular-nums">Received {{ c.quote_received_at | ist }}</p>
+          {% if c.quote_email %}<button type="button" class="btn-outline !py-1 !px-2 text-xs" @click='showMail({{ c.quote_email | tojson }})'><i data-lucide="mail-open" class="h-3.5 w-3.5"></i>View email</button>{% endif %}
+        </div>
       </article>
       {% endif %}
     </div>

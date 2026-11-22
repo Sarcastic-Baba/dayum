@@ -4,29 +4,33 @@ from datetime import datetime, timedelta, timezone
 
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# Pipeline stepper (PRD §8): label -> the states that count as "at this step".
-STEPPER = [
-    ("Received", ["RECEIVED"]),
-    ("Parsed", ["SPEC_PARSED"]),
-    ("Found", ["CANDIDATES_FOUND"]),
-    ("Checked", ["CANDIDATES_CHECKED"]),
-    ("Shortlisted", ["SHORTLISTED", "RECOMMENDED"]),
-    ("RFQ approval", ["WAIT_APPROVAL_RFQ"]),
-    ("RFQs sent", ["RFQS_SENT"]),
-    ("Awaiting quotes", ["WAIT_QUOTES"]),
-    ("Quotes in", ["QUOTES_RECEIVED"]),
-    ("Ranked", ["RANKED"]),
-    ("PO approval", ["WAIT_APPROVAL_PO"]),
-    ("PO sent", ["PO_SENT"]),
-    ("Done", ["DONE"]),
-]
+# State labels (chaitanya/DASHBOARD.md §2.6), in pipeline order. HELD is terminal, shown apart.
+STATE_LABELS = {
+    "RECEIVED": "Queued",
+    "SPEC_PARSED": "Request understood",
+    "CANDIDATES_FOUND": "Suppliers found",
+    "CANDIDATES_CHECKED": "Suppliers verified",
+    "SHORTLISTED": "Shortlisted",
+    "RECOMMENDED": "Shortlist ready",
+    "WAIT_APPROVAL_RFQ": "Waiting for RFQ approval",
+    "RFQS_SENT": "RFQs sent",
+    "WAIT_QUOTES": "Waiting for quotes",
+    "QUOTES_RECEIVED": "Quotes in",
+    "RANKED": "Ranked",
+    "WAIT_APPROVAL_PO": "Waiting for PO approval",
+    "PO_SENT": "PO sent",
+    "DONE": "Done",
+    "HELD": "On hold",
+}
+STEPPER = [(label, [state]) for state, label in STATE_LABELS.items() if state != "HELD"]
+HUMAN_WAIT = {"WAIT_APPROVAL_RFQ", "WAIT_APPROVAL_PO"}
 
 STATUS_STYLE = {
     "pending": ("slate", "Pending"),
-    "recommended": ("emerald", "Recommended"),
-    "awaiting_quotes": ("indigo", "Awaiting quotes"),
+    "recommended": ("indigo", "Recommended"),
+    "awaiting_quotes": ("amber", "Awaiting quotes"),
     "no_verified_supplier": ("rose", "No verified supplier"),
-    "held": ("amber", "Held"),
+    "held": ("rose", "Held"),
 }
 
 RESULT_STYLE = {"pass": "emerald", "fail": "rose", "cannot_verify": "amber"}
@@ -129,4 +133,5 @@ def install(templates) -> None:
     env.filters.update(inr=inr, num=indian_number, ist=ist, day=day, duration=duration, size=size,
                        safe_url=safe_url)
     env.globals.update(stepper=stepper, STATUS_STYLE=STATUS_STYLE, RESULT_STYLE=RESULT_STYLE,
-                       CLASSIFICATION_STYLE=CLASSIFICATION_STYLE, CHECK_LABEL=CHECK_LABEL)
+                       CLASSIFICATION_STYLE=CLASSIFICATION_STYLE, CHECK_LABEL=CHECK_LABEL,
+                       STATE_LABELS=STATE_LABELS, HUMAN_WAIT=HUMAN_WAIT)
