@@ -1,5 +1,8 @@
 # BoxSource — Platform & Dashboard (Chaitanya / Codex)
 
+> **Start with [`DASHBOARD.md`](DASHBOARD.md)** — the full dashboard requirements and the exact
+> data contract the engine writes. This file is the brief and the visual design spec.
+
 > Your build brief. Canonical specs: [`../PRD-sourcing.md`](../PRD-sourcing.md) and [`../background-check-criteria.md`](../background-check-criteria.md). Read both before coding. This file tells you **your half** and where the boundary is. You've already scaffolded `app.py`, the Supabase migration and the Vercel config — this continues from there.
 
 ## Mission

@@ -113,9 +113,9 @@ def h_recommended(ctx):
     spec = ctx.spec
     for sid in ctx.narrative()["shortlist"]:
         cand = ctx.candidate(sid)
-        actions.draft(ctx.db, ctx.rid, "send_rfq", sid,
-                      lambda key, c=cand: emails.build_rfq(ctx.cfg, ctx.rid, spec, c, key))
-        actions.request_approval(ctx.db, ctx.rid, "send_rfq", sid)
+        msg = actions.draft(ctx.db, ctx.rid, "send_rfq", sid,
+                            lambda key, c=cand: emails.build_rfq(ctx.cfg, ctx.rid, spec, c, key))
+        actions.request_approval(ctx.db, ctx.rid, "send_rfq", sid, msg)
     return "WAIT_APPROVAL_RFQ"
 
 
@@ -128,6 +128,9 @@ def _send_approved(ctx, action):
     for a in rows:
         if a["status"] == "approved":
             msg = actions.stored_draft(ctx.db, ctx.rid, action, a["supplier_id"])
+            if a.get("email_body") is not None and a["email_body"] != msg["body"]:
+                raise StepFailed(f"{action} to {a['supplier_id']}: the approved text differs "
+                                 "from the draft, so nothing was sent")
             outcome = actions.send_once(ctx.db, ctx.transport, ctx.rid, action,
                                         a["supplier_id"], a["id"], msg)
             ledger.log_step(ctx.db, ctx.cfg, ctx.rid, action, outcome, supplier_id=a["supplier_id"])
@@ -231,10 +234,10 @@ def h_ranked(ctx):
     quote = [q for q in ctx.db.select("quotes", {"request_id": ctx.rid, "supplier_id": sid},
                                       order=["id"]) if q["parsed_ok"]][-1]
     cand, spec = ctx.candidate(sid), ctx.spec
-    actions.draft(ctx.db, ctx.rid, "send_po", sid,
-                  lambda key: emails.build_po(ctx.cfg, ctx.rid, spec, cand, quote,
-                                              rec["trial_order_qty"], key))
-    actions.request_approval(ctx.db, ctx.rid, "send_po", sid)
+    msg = actions.draft(ctx.db, ctx.rid, "send_po", sid,
+                        lambda key: emails.build_po(ctx.cfg, ctx.rid, spec, cand, quote,
+                                                    rec["trial_order_qty"], key))
+    actions.request_approval(ctx.db, ctx.rid, "send_po", sid, msg)
     return "WAIT_APPROVAL_PO"
 
 
