@@ -267,9 +267,12 @@ def answer(cfg, query, call_id=None):
     s = SESSIONS.setdefault(key, {"words": [], "pending": None, "request_id": None,
                                   "tokens": [0, 0]})
     v = cfg["voice"]
-    short_yes = (bool(AFFIRM_RE.match(q) or APPROVE_RE.search(q))
-                 and not re.search(r"\d", q) and len(q.split()) <= 8)
-    if s["pending"] and short_yes and not NEGATE_RE.match(q):
+    # The phone assistant often rephrases a caller's "yes" ("Confirm registration of 11 boxes…"),
+    # so while a read-back is pending any confirmation counts — unless the caller asks for a change.
+    confirms = bool(AFFIRM_RE.match(q) or APPROVE_RE.search(q)
+                    or re.search(r"\b(confirm\w*|register\w*|go ahead|yes|correct)\b", q, re.I))
+    wants_change = bool(NEGATE_RE.match(q) or re.search(r"\b(change|instead|actually|make it|not)\b", q, re.I))
+    if s["pending"] and confirms and not wants_change:
         return to_speech(register(cfg, open_db(cfg), s, key))
     if s["request_id"]:
         return to_speech(v["already_registered"])
