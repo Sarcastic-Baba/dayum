@@ -11,9 +11,15 @@
 |---|---|
 | Hosting | Vercel project **`dayum`** → https://dayum-six.vercel.app — connected to `Sarcastic-Baba/dayum`; **every push to `main` deploys** |
 | Database | Supabase project **`contextcon`** (ref `xyivrxjdvckfibdfwgza`) — your schema is live; all 12 tables exist |
-| Env vars on Vercel (prod, preview, dev) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `HEALTHCHECK_TOKEN`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `CRUSTDATA_API_KEY` |
-| Still to add (you choose the values) | `DEMO_APPROVER_EMAIL`, `DEMO_APPROVER_PASSWORD`, `DEMO_VIEWER_EMAIL`, `DEMO_VIEWER_PASSWORD` (`vercel env add …`) |
+| Env vars on Vercel (prod, preview, dev) | `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `HEALTHCHECK_TOKEN`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `CRUSTDATA_API_KEY`, `DEMO_APPROVER_EMAIL`, `DEMO_APPROVER_PASSWORD`, `DEMO_VIEWER_EMAIL`, `DEMO_VIEWER_PASSWORD` — **all set already** |
+| Demo logins | approver `approver@example.com`, viewer `viewer@example.com`; the passwords and `HEALTHCHECK_TOKEN` come from Ujjwal (outside chat) — put the same values in your local `.env` |
+| Who manages Vercel | **Ujjwal** — you have no Vercel access. You deploy by pushing to `main`; he adds env vars and reads deploy logs. After your first push he checks `vercel ls` that a production deploy appeared (a free-plan project can block deploys from commit authors who aren't members; if so he redeploys after pulling) |
 | Sourcing engine | a separate worker on Ujjwal's laptop (`python cli.py run`), reading and writing the same Supabase |
+
+**Your live schema is ahead of the repo.** The live database has things that aren't in
+`supabase/migrations/`: the approval preview columns and `idem_key`, `requests.created_by`,
+the `state`/`status` CHECKs, and both triggers. Commit that migration so the repo matches
+production.
 
 The dashboard reads and writes Supabase **server-side only**, with `SUPABASE_SECRET_KEY` over
 PostgREST (the pattern in `app.py` → `/api/ready`). Browser roles have no table access (RLS on,
@@ -65,6 +71,12 @@ and `status` default to `RECEIVED` / `pending`, and the worker takes over. `inpu
 Required fields in the form: item, quantity per month, delivery location, ply, size (L × W × H in
 inches). Optional: material, printing, needed-by date, budget. Collect **structured fields** —
 the engine does not parse free text yet (a free-text request would end on hold).
+
+**Expect your test requests to end on hold for now.** Supplier discovery isn't wired yet, so
+when the worker runs, a new request goes RECEIVED → … → `HELD` with status
+`no_verified_supplier` and `held_reason` "no candidate suppliers found by the search". That is
+correct behaviour, not a form bug — use it to build the HELD screen. It goes away when
+discovery lands.
 
 Voice requests also carry `input_json.channel = "voice"`, `input_json.call_id` and
 `input_json.caller_words` (what the caller said). Show a small "Phone" badge for them. The
