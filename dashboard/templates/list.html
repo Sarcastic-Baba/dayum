@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Requests{% endblock %}
+{% block content %}
+<div class="flex flex-wrap items-end justify-between gap-4 mb-6">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight">Sourcing requests</h1>
+    <p class="muted text-sm mt-1">Each request runs discovery, background checks, RFQs and a purchase order — with a source for every fact.</p>
+  </div>
+  {% if user.can_approve %}
+  <a href="/requests/new" class="btn-primary"><i data-lucide="plus" class="h-4 w-4"></i>New request</a>
+  {% endif %}
+</div>
+
+{% if not requests %}
+<div class="card p-10 text-center">
+  <span class="inline-grid place-items-center h-12 w-12 rounded-full bg-accent-50 dark:bg-accent-600/20 text-accent-600 mb-3"><i data-lucide="inbox" class="h-6 w-6"></i></span>
+  <h2 class="font-semibold">No requests yet</h2>
+  <p class="muted text-sm mt-1">Submit a request like “50,000 five-ply boxes a month for Gurgaon” to start a sourcing run.</p>
+  {% if user.can_approve %}<a href="/requests/new" class="btn-primary mt-5"><i data-lucide="plus" class="h-4 w-4"></i>New request</a>{% endif %}
+</div>
+{% else %}
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900/60 text-left">
+        <tr class="eyebrow">
+          <th scope="col" class="px-4 py-3">Request</th>
+          <th scope="col" class="px-4 py-3">Item</th>
+          <th scope="col" class="px-4 py-3 hidden md:table-cell">Location</th>
+          <th scope="col" class="px-4 py-3">Status</th>
+          <th scope="col" class="px-4 py-3 text-right">Cost</th>
+          <th scope="col" class="px-4 py-3 hidden sm:table-cell text-right">Last update</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+        {% for r in requests %}
+        {% set color, label = STATUS_STYLE.get(r.status, ('slate', r.status)) %}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+          <td class="px-4 py-3 font-medium">
+            <a href="/requests/{{ r.request_id }}" class="text-accent-600 dark:text-accent-100 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded">{{ r.request_id }}</a>
+            <div class="muted text-xs font-normal">{{ r.state | replace('_', ' ') | lower | capitalize }}</div>
+          </td>
+          <td class="px-4 py-3">{{ r['item'] }}</td>
+          <td class="px-4 py-3 hidden md:table-cell">{{ r.location }}</td>
+          <td class="px-4 py-3"><span class="pill bg-{{ color }}-100 text-{{ color }}-700 dark:bg-{{ color }}-500/15 dark:text-{{ color }}-300">{{ label }}</span></td>
+          <td class="px-4 py-3 text-right tabular-nums">{{ r.cost_inr | inr }}</td>
+          <td class="px-4 py-3 hidden sm:table-cell text-right muted tabular-nums">{{ r.updated_at | ist }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

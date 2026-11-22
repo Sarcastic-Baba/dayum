@@ -1,0 +1,19 @@
+{# Live region. While the engine is working it re-fetches itself every 3 s (paused while a
+   drawer or dialog is open). It stops when nothing will change without a human. #}
+<div id="live"
+     x-data="{ drawer: null,
+               open(id) { this.drawer = id; window.bsPause = true; },
+               close() { this.drawer = null; window.bsPause = false; } }"
+     @keydown.escape.window="close()"
+     {% if poll %}hx-get="/requests/{{ r.request_id }}/live" hx-trigger="every 3s [!window.bsPause]" hx-swap="outerHTML"{% endif %}
+     class="space-y-6">
+  {% include "partials/header.html" %}
+  {% include "partials/stepper.html" %}
+  {% include "partials/summary.html" %}
+  {% include "partials/approvals.html" %}
+  {% include "partials/candidates.html" %}
+  {% include "partials/recommendation.html" %}
+  {% include "partials/timeline.html" %}
+  {% include "partials/log.html" %}
+  {% for c in r.candidates %}{% include "partials/drawer.html" %}{% endfor %}
+</div>

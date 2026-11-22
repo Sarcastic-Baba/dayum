@@ -8,3 +8,4 @@ supabase
 *.pdf
 PRD-sourcing.md
 background-check-criteria.md
+requirements-dev.txt

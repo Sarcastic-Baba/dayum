@@ -303,6 +303,16 @@ grant all on public.quotes to service_role;
 
 **Write-order rules the engine follows (from the FKs):** `requests` → `candidates` (a merge target before its duplicate) → `checks` / `evidence` / `approvals` → `steps` → `outbox` (needs both a `steps.idem_key` and an `approvals.id`).
 
+**Applied in `supabase/migrations/20261122000200_contract_v1.sql`** — the two items above verbatim, plus these platform additions (engine: please confirm):
+- `requests.state` / `requests.status` are CHECK-constrained to exactly the §8 values (`status` also allows `pending`, the intake default). A new state needs a migration.
+- `requests.created_by` — the dashboard user (or `api`) who submitted it. `requests.updated_at` is now set automatically on every update.
+- **The approval draft travels with the approval row:** `approvals.idem_key` (UNIQUE, = `sha256(request_id:action:supplier_id)`), `email_to`, `email_subject`, `email_body`, `created_at`. The engine fills these when it creates the `pending` row; the dashboard shows exactly these fields; **the engine sends exactly these fields** (not a regenerated body). Approving posts back a hash of the text shown, so a draft that changed after viewing is refused.
+- A trigger makes a decision final: once `approvals.status` is not `pending` it cannot change, and the draft cannot change in the same write as the decision.
+
+**`requests.result_json` keys the dashboard reads** (all optional; missing → shown as "not yet"): `summary`, `assumptions` (list of strings), `recommendation` (§7 object), `held_reason`, `duration_s` (from the ledger), `limits` (`{cost_inr_per_request, time_s_per_request}` copied from config, for the progress bars), `candidates` (list of `{supplier_id, rank, listed_price_inr_per_unit, price_basis, distance_km, est_transport_inr_per_unit, est_landed_inr_per_unit, flags}`; these override the same keys in `candidates.data_json`). Quoted price/MOQ/lead time come from the `quotes` table (latest `parsed_ok` row). `cost_inr` is summed live from `costs`. Action status: approval `pending` → `pending_approval`, `rejected` → `skipped`, `approved` → `approved`, and `done` once its `idem_key` is in `outbox`.
+
+**Input (§7) addition:** a free-text request is stored as `input_json.free_text` (structured fields left `null`) for `parse_request.py`.
+
 ## 15. Config (`config.yaml`)
 ```yaml
 min_record_date: 2026-09-01

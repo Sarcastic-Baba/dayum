@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}BoxSource{% endblock %} · BoxSource</title>
+  <script>
+    // Theme before first paint: saved choice, else the OS setting.
+    (function () {
+      var saved = null;
+      try { saved = localStorage.getItem("bs-theme"); } catch (e) {}
+      var dark = saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.classList.toggle("dark", dark);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: { sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"] },
+          colors: { accent: { 50: "#EEF2FF", 100: "#E0E7FF", 500: "#6366F1", 600: "#4F46E5", 700: "#4338CA" } },
+          borderRadius: { card: "12px", ctl: "8px" },
+          boxShadow: { card: "0 1px 2px rgb(15 23 42 / 0.04), 0 4px 16px -4px rgb(15 23 42 / 0.08)" },
+        },
+      },
+    };
+  </script>
+  <style type="text/tailwindcss">
+    @layer components {
+      .card { @apply bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-card shadow-card; }
+      .btn { @apply inline-flex items-center justify-center gap-2 rounded-ctl px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed; }
+      .btn-primary { @apply btn bg-accent-600 text-white hover:bg-accent-700; }
+      .btn-ghost { @apply btn text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800; }
+      .btn-danger { @apply btn bg-rose-600 text-white hover:bg-rose-700; }
+      .btn-outline { @apply btn border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800; }
+      .input { @apply w-full rounded-ctl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500; }
+      .label { @apply block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5; }
+      .pill { @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap; }
+      .muted { @apply text-slate-500 dark:text-slate-400; }
+      .eyebrow { @apply text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400; }
+    }
+  </style>
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+</head>
+<body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased">
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 btn-primary">Skip to content</a>
+
+  <header class="sticky top-0 z-30 border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-950/80 backdrop-blur">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 h-14 flex items-center gap-4">
+      <a href="/" class="flex items-center gap-2 font-semibold tracking-tight">
+        <span class="grid place-items-center h-7 w-7 rounded-ctl bg-accent-600 text-white"><i data-lucide="package" class="h-4 w-4"></i></span>
+        BoxSource
+      </a>
+      <span class="hidden sm:inline muted text-sm">Packaging supplier sourcing</span>
+      <div class="ml-auto flex items-center gap-1 sm:gap-2">
+        <button type="button" class="btn-ghost !px-2.5" aria-label="Toggle dark mode" title="Toggle dark mode"
+                onclick="var d=document.documentElement.classList.toggle('dark');try{localStorage.setItem('bs-theme',d?'dark':'light')}catch(e){}">
+          <i data-lucide="sun-moon" class="h-4 w-4"></i>
+        </button>
+        {% if user %}
+        <span class="hidden md:inline-flex items-center gap-2 text-sm">
+          <span class="muted">{{ user.email }}</span>
+          <span class="pill {{ 'bg-accent-50 text-accent-700 dark:bg-accent-600/20 dark:text-accent-100' if user.can_approve else 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' }}">
+            {{ 'Approver' if user.can_approve else 'Viewer · read-only' }}
+          </span>
+        </span>
+        <form method="post" action="/logout">
+          <button class="btn-ghost !px-2.5" aria-label="Log out" title="Log out"><i data-lucide="log-out" class="h-4 w-4"></i></button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  {% set toast_text = toast_notice or toast_error %}
+  {% if toast_text %}
+  <div x-data="{ show: true }" x-init="history.replaceState(null, '', location.pathname); setTimeout(() => show = false, {{ 9000 if toast_error else 5000 }})"
+       x-show="show" x-transition role="{{ 'alert' if toast_error else 'status' }}"
+       class="fixed top-16 right-4 left-4 sm:left-auto z-50 sm:max-w-md card p-4 flex items-start gap-3 {{ 'border-rose-300 dark:border-rose-800' if toast_error else 'border-emerald-300 dark:border-emerald-800' }}">
+    <i data-lucide="{{ 'circle-alert' if toast_error else 'circle-check' }}" class="h-5 w-5 shrink-0 {{ 'text-rose-600' if toast_error else 'text-emerald-600' }}"></i>
+    <p class="text-sm">{{ toast_text }}</p>
+    <button type="button" class="ml-auto muted hover:text-slate-900 dark:hover:text-white" aria-label="Dismiss" @click="show = false"><i data-lucide="x" class="h-4 w-4"></i></button>
+  </div>
+  {% endif %}
+
+  <main id="main" class="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    lucide.createIcons();
+    document.body.addEventListener("htmx:afterSwap", function () { lucide.createIcons(); });
+  </script>
+</body>
+</html>

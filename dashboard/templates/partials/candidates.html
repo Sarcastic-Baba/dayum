@@ -1,0 +1,86 @@
+<section class="card overflow-hidden" aria-labelledby="cand-title">
+  <div class="px-5 pt-5 pb-3 flex flex-wrap items-center justify-between gap-2">
+    <h2 id="cand-title" class="font-semibold">Candidate suppliers</h2>
+    <div class="flex flex-wrap gap-3 text-xs muted" aria-label="Legend">
+      <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>pass</span>
+      <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-full bg-rose-500"></span>fail</span>
+      <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-full bg-amber-400"></span>cannot verify</span>
+      <span class="inline-flex items-center gap-1"><span class="h-2.5 w-2.5 rounded-full bg-slate-200 dark:bg-slate-700"></span>not run</span>
+    </div>
+  </div>
+
+  {% if not r.candidates %}
+  <div class="px-5 pb-6">
+    {% if poll %}
+    <div class="space-y-3 animate-pulse" aria-label="Searching for suppliers">
+      {% for _ in range(3) %}<div class="h-10 rounded-ctl bg-slate-100 dark:bg-slate-800"></div>{% endfor %}
+    </div>
+    <p class="muted text-sm mt-3">Searching for manufacturers near the delivery location…</p>
+    {% else %}
+    <p class="muted text-sm">No candidates were found for this request.</p>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 dark:bg-slate-900/60 text-left">
+        <tr class="eyebrow">
+          <th scope="col" class="px-4 py-2.5 w-12 text-center">#</th>
+          <th scope="col" class="px-4 py-2.5">Supplier</th>
+          <th scope="col" class="px-4 py-2.5 hidden sm:table-cell">Checks</th>
+          <th scope="col" class="px-4 py-2.5 text-right hidden lg:table-cell">Listed</th>
+          <th scope="col" class="px-4 py-2.5 text-right">Quoted</th>
+          <th scope="col" class="px-4 py-2.5 text-right hidden md:table-cell">Distance</th>
+          <th scope="col" class="px-4 py-2.5 text-right hidden md:table-cell">Landed <span class="normal-case font-normal">(est.)</span></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+        {% for c in r.candidates %}
+        {% set cls_color = CLASSIFICATION_STYLE.get(c.classification, 'slate') %}
+        {% set results = {} %}
+        {% for k in c.checks %}{% set _ = results.update({k.check: k.result}) %}{% endfor %}
+        <tr class="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition cursor-pointer {{ 'opacity-60' if c.merged_into }}" @click='open({{ c.supplier_id | tojson }})'>
+          <td class="px-4 py-3 text-center tabular-nums font-semibold">
+            {% if c.rank %}<span class="inline-grid place-items-center h-6 w-6 rounded-full {{ 'bg-accent-600 text-white' if c.rank == 1 else 'bg-slate-100 dark:bg-slate-800' }}">{{ c.rank }}</span>{% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td class="px-4 py-3">
+            <button type="button" class="text-left font-medium hover:text-accent-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 rounded"
+                    @click.stop='open({{ c.supplier_id | tojson }})' aria-label="Open evidence for {{ c.name }}">{{ c.name }}</button>
+            <div class="mt-1 flex flex-wrap items-center gap-1.5">
+              <span class="pill bg-{{ cls_color }}-100 text-{{ cls_color }}-700 dark:bg-{{ cls_color }}-500/15 dark:text-{{ cls_color }}-300">{{ c.classification | replace('_', ' ') }}</span>
+              {% if c.merged_into %}<span class="pill bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><i data-lucide="merge" class="h-3 w-3"></i>merged into {{ c.merged_into }}</span>{% endif %}
+              {% for f in c.flags %}<span class="pill bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300"><i data-lucide="flag" class="h-3 w-3"></i>{{ f | replace('_', ' ') }}</span>{% endfor %}
+            </div>
+          </td>
+          <td class="px-4 py-3 hidden sm:table-cell">
+            <div class="flex items-center gap-1.5">
+              {% for name in ['real_active', 'manufacturer', 'duplicate', 'spec_match', 'price', 'distance', 'fraud_risk'] %}
+              {% set res = results.get(name) %}
+              {% set dot = {'pass': 'bg-emerald-500', 'fail': 'bg-rose-500', 'cannot_verify': 'bg-amber-400'}.get(res, 'bg-slate-200 dark:bg-slate-700') %}
+              <span class="h-2.5 w-2.5 rounded-full {{ dot }}" title="{{ CHECK_LABEL[name] }}: {{ (res or 'not run') | replace('_', ' ') }}" role="img" aria-label="{{ CHECK_LABEL[name] }}: {{ (res or 'not run') | replace('_', ' ') }}"></span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="px-4 py-3 text-right tabular-nums hidden lg:table-cell">
+            {{ c.listed_price_inr_per_unit | inr }}
+            {% if c.listed_price_inr_per_unit is not none and c.price_basis %}<div class="muted text-xs">{{ c.price_basis }}</div>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-right tabular-nums font-medium">
+            {{ c.quoted_price_inr_per_unit | inr }}
+            {% if c.quoted_price_inr_per_unit is not none and c.quote_basis %}<div class="muted text-xs font-normal">{{ c.quote_basis }}</div>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-right tabular-nums hidden md:table-cell">{% if c.distance_km is not none %}{{ c.distance_km | num }} km{% else %}—{% endif %}</td>
+          <td class="px-4 py-3 text-right tabular-nums hidden md:table-cell">
+            {% if c.est_landed_inr_per_unit is not none %}
+            <span title="Estimate: quoted price + transport from the client's own rates. Not a sourced fact.">{{ c.est_landed_inr_per_unit | inr }}</span>
+            <div class="text-xs text-slate-400 italic">estimate</div>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="px-5 py-3 text-xs muted border-t border-slate-100 dark:border-slate-800">Click a supplier to see every check with its source, quote and date. Landed cost and transport are <em>estimates</em> from the client's rates, not sourced facts.</p>
+  {% endif %}
+</section>
