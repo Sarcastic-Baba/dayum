@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+.vercel/
+.venv/
+.npm-cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+supabase/.temp/
+supabase/.branches/
+data/

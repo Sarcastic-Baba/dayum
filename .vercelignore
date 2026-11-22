@@ -1,0 +1,10 @@
+.git
+.env*
+.venv
+.npm-cache
+__pycache__
+tests
+supabase
+*.pdf
+PRD-sourcing.md
+background-check-criteria.md
