@@ -26,8 +26,8 @@ pricing:                              # INR per unit for the cost ledger — fil
   web_search_per_call: 0.0
 
 storage:
-  backend: sqlite                     # sqlite (local runs, tests) | supabase (with the dashboard)
-  sqlite_path: data/boxsource.db
+  backend: supabase                   # supabase (shared with the dashboard) | sqlite (offline runs)
+  sqlite_path: data/boxsource.db      # used only when backend is sqlite; tests use their own
 
 email:
   transport: file                     # file (local .eml) | smtp (team test inbox, for the demo)

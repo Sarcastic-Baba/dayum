@@ -242,11 +242,16 @@ slate, `recommended` indigo, `awaiting_quotes` amber, `no_verified_supplier` ros
 
 ## 5. Developing before real data exists
 
-The database starts empty. Ujjwal will seed a demo request (`DEMO-UI-1`) into Supabase,
-produced by the real engine from test fixtures, parked at *Waiting for RFQ approval* with two
-fixture suppliers, evidence, and pending approvals carrying email previews. Build against it;
-it is clearly marked as fixture data and is deleted before the demo. Until then, build against
-§2.2 directly.
+**`DEMO-UI-1` is already in Supabase** — produced by the real engine from test fixtures and
+parked at *Waiting for RFQ approval*: two fixture manufacturers (7 checks each, with
+evidence), one fixture trader in `not_eligible`, a full `result_json`, and two pending
+`send_rfq` approvals carrying email previews. Every name ends in "(fixture)" and every URL is
+on example.invalid. Build against it.
+
+- Re-create it: `python tests/seed_dashboard_demo.py` (safe to re-run)
+- Delete it before the demo: `python tests/seed_dashboard_demo.py --delete`
+- Approving its RFQs from the dashboard is fine for testing: while Ujjwal's worker runs, it
+  "sends" them to a local file outbox, never to a real supplier.
 
 ## 6. Acceptance checklist
 
