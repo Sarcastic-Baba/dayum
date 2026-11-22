@@ -29,9 +29,14 @@ def stored_draft(db, request_id, action, supplier_id):
     return row["output_json"] if row and row["status"] == "done" else None
 
 
-def request_approval(db, request_id, action, supplier_id):
+def request_approval(db, request_id, action, supplier_id, message):
+    """A pending approval carrying the exact email the approver will see. The database
+    freezes that text once a decision is made (approvals_guard_update)."""
     db.insert("approvals", {"request_id": request_id, "action": action,
-                            "supplier_id": supplier_id, "status": "pending"},
+                            "supplier_id": supplier_id, "status": "pending",
+                            "idem_key": send_key(request_id, action, supplier_id),
+                            "email_to": message["to"], "email_subject": message["subject"],
+                            "email_body": message["body"]},
               conflict=["request_id", "action", "supplier_id"])
 
 

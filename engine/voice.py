@@ -212,7 +212,8 @@ def register(cfg, db, s, call_key):
     base = rid = s["request_id"] or request_id_for(call_key)
     for n in range(2, 7):
         raw["request_id"] = rid
-        won = db.insert("requests", {"request_id": rid, "input_json": raw}, conflict=["request_id"])
+        won = db.insert("requests", {"request_id": rid, "input_json": raw, "created_by": "voice"},
+                        conflict=["request_id"])
         if won:
             break
         owner = (db.select("requests", {"request_id": rid})[0]["input_json"] or {}).get("call_id")

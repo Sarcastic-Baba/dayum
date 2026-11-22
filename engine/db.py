@@ -26,14 +26,24 @@ import httpx
 JSON_COLS = {"input_json", "spec_json", "result_json", "data_json", "output_json", "source_json"}
 _NOW = "(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))"
 
+STATES = ("RECEIVED", "SPEC_PARSED", "CANDIDATES_FOUND", "CANDIDATES_CHECKED", "SHORTLISTED",
+          "RECOMMENDED", "WAIT_APPROVAL_RFQ", "RFQS_SENT", "WAIT_QUOTES", "QUOTES_RECEIVED",
+          "RANKED", "WAIT_APPROVAL_PO", "PO_SENT", "DONE", "HELD")
+STATUSES = ("pending", "recommended", "awaiting_quotes", "no_verified_supplier", "held")
+_IN = lambda values: ", ".join(f"'{v}'" for v in values)  # noqa: E731
+
+# Mirrors the live Supabase schema (inspected 22 Nov 2026), including the platform's
+# additions: requests.created_by, the approval email-preview columns, and the trigger that
+# makes a decision final and freezes the draft the approver saw.
 SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS requests (
   request_id TEXT PRIMARY KEY,
   input_json TEXT NOT NULL,
   spec_json TEXT,
-  state TEXT NOT NULL DEFAULT 'RECEIVED',
-  status TEXT NOT NULL DEFAULT 'pending',
+  state TEXT NOT NULL DEFAULT 'RECEIVED' CHECK (state IN ({_IN(STATES)})),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ({_IN(STATUSES)})),
   result_json TEXT,
+  created_by TEXT,
   created_at TEXT NOT NULL DEFAULT {_NOW},
   updated_at TEXT NOT NULL DEFAULT {_NOW}
 );
@@ -93,6 +103,11 @@ CREATE TABLE IF NOT EXISTS approvals (
   approver TEXT,
   reason TEXT,
   decided_at TEXT,
+  idem_key TEXT UNIQUE,
+  email_to TEXT,
+  email_subject TEXT,
+  email_body TEXT,
+  created_at TEXT NOT NULL DEFAULT {_NOW},
   UNIQUE (request_id, action, supplier_id),
   FOREIGN KEY (request_id, supplier_id) REFERENCES candidates(request_id, supplier_id),
   CHECK (status = 'pending' OR (approver IS NOT NULL AND decided_at IS NOT NULL)),
@@ -159,6 +174,21 @@ CREATE INDEX IF NOT EXISTS costs_request_idx ON costs(request_id);
 CREATE INDEX IF NOT EXISTS logs_request_idx ON logs(request_id, at);
 """
 
+TRIGGERS = """
+CREATE TRIGGER IF NOT EXISTS approvals_guard_update BEFORE UPDATE ON approvals
+BEGIN
+  SELECT RAISE(ABORT, 'approval already decided') WHERE OLD.status <> 'pending';
+  SELECT RAISE(ABORT, 'approval draft changed during decision')
+   WHERE NEW.status <> 'pending' AND (NEW.email_to IS NOT OLD.email_to
+      OR NEW.email_subject IS NOT OLD.email_subject OR NEW.email_body IS NOT OLD.email_body);
+END;
+"""
+
+# Columns added after the first local databases were created (ALTER keeps their data).
+_UPGRADES = {"requests": {"created_by": "TEXT"},
+             "approvals": {"idem_key": "TEXT", "email_to": "TEXT", "email_subject": "TEXT",
+                           "email_body": "TEXT", "created_at": "TEXT"}}
+
 
 def _scalar(v):
     """Dates (e.g. from YAML) become ISO strings; everything else passes through."""
@@ -180,6 +210,13 @@ class SQLiteDB:
         self.conn.execute("PRAGMA journal_mode = WAL")
         self.conn.execute("PRAGMA synchronous = FULL")
         self.conn.executescript(SCHEMA)
+        for table, cols in _UPGRADES.items():
+            have = {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+            for col, typ in cols.items():
+                if col not in have:
+                    self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+        self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS approvals_idem_key_uq ON approvals(idem_key)")
+        self.conn.executescript(TRIGGERS)
 
     @staticmethod
     def _enc(row):

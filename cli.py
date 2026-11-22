@@ -73,8 +73,8 @@ def main(argv=None):
     if args.cmd == "submit":
         with open(args.file, encoding="utf-8") as f:
             raw = json.load(f)
-        won = db.insert("requests", {"request_id": raw["request_id"], "input_json": raw},
-                        conflict=["request_id"])
+        won = db.insert("requests", {"request_id": raw["request_id"], "input_json": raw,
+                                     "created_by": "cli"}, conflict=["request_id"])
         print(("submitted " if won else "already exists: ") + raw["request_id"])
     elif args.cmd in ("approve", "reject"):
         _decide(db, args, "approved" if args.cmd == "approve" else "rejected")
